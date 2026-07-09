@@ -40,7 +40,7 @@ class CompletionDataset(Dataset):
                 )
         """
         self.offsets = [] #建立磁盘字节偏移量索引
-        with open(jsonl_path, "r", encoding="utf-8") as f:
+        with open(jsonl_path, "rb") as f:
             offset=0
 
             print('index building...')
@@ -106,9 +106,10 @@ class CompletionDataset(Dataset):
                 )
         }
 
-word_voc=WordVocabulary(r'./model/datasets/vocabulary/word2id.json')
-ch_voc=CharacterVocabulary()
 if __name__=='__main__':
+    word_voc=WordVocabulary(r'./model/datasets/vocabulary/word2id.json')
+    ch_voc=CharacterVocabulary()
+    
     dataset=CompletionDataset(r'./model/datasets/processed/train.jsonl',
                               word_voc,
                               ch_voc)
