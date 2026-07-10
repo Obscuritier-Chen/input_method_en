@@ -6,7 +6,6 @@ class PrefixEncoder(nn.Module):
 
     def __init__(
         self,
-        vocab_size,
         config,
         padding_idx=0
     ):
@@ -15,7 +14,7 @@ class PrefixEncoder(nn.Module):
 
         self.embedding = nn.Embedding(
 
-            vocab_size,
+            config.char_vocab_size,
 
             config.embedding_dim,
 

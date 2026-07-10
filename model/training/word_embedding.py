@@ -6,15 +6,14 @@ class WordEmbedding(nn.Module):
 
     def __init__(
         self,
-        vocab_size,
         config,
         padding_idx=0,
     ):
 
         super().__init__()
-
+        
         self.embedding = nn.Embedding(
-            num_embeddings=vocab_size,
+            num_embeddings=config.word_vocab_size,
             embedding_dim=config.embedding_dim,
             padding_idx=padding_idx
         )

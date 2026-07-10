@@ -21,7 +21,7 @@ def collator(batch):
         padding_value=0
     )
 
-    labels = torch.stack(
+    label = torch.stack(
         [sample["label"] for sample in batch]
     )
 
@@ -39,7 +39,7 @@ def collator(batch):
 
         "prefix_mask": prefix_mask,
 
-        "labels": labels
+        "label": label
     }
 
 if __name__=='__main__':
