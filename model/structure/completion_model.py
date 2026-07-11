@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 
-from embedding_builder import EmbeddingBuilder
-from word_embedding import WordEmbedding
-from position_encoding import PositionalEncoding
-from prefix_encode import PrefixEncoder
-from type_embedding import TypeEmbedding
-from transformer_encoder import TransformerEncoder
-from prediction_head import PredictionHead
+from .embedding_builder import EmbeddingBuilder
+from .word_embedding import WordEmbedding
+from .position_encoding import PositionalEncoding
+from .prefix_encode import PrefixEncoder
+from .type_embedding import TypeEmbedding
+from .transformer_encoder import TransformerEncoder
+from .prediction_head import PredictionHead
 
 
 class CompletionModel(nn.Module):

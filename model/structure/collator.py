@@ -3,9 +3,9 @@ from torch.nn.utils.rnn import pad_sequence
 
 from torch.utils.data import DataLoader
 
-from completion_dataset import CompletionDataset
-from ch_vocabulary import CharacterVocabulary
-from word_vocabulary import WordVocabulary
+from .completion_dataset import CompletionDataset
+from .ch_vocabulary import CharacterVocabulary
+from .word_vocabulary import WordVocabulary
 
 def collator(batch):
 

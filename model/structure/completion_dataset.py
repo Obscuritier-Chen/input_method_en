@@ -3,8 +3,8 @@ import json
 import torch
 from torch.utils.data import Dataset
 
-from ch_vocabulary import CharacterVocabulary
-from word_vocabulary import WordVocabulary
+from .ch_vocabulary import CharacterVocabulary
+from .word_vocabulary import WordVocabulary
 
 import os
 from pathlib import Path
