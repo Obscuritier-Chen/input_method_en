@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class PredictionHead(nn.Module):#实际上就是个mlp
+class PredictionHead(nn.Module):
 
     def __init__(
         self,

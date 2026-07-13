@@ -18,9 +18,9 @@ VOCAB_PATH = "model/datasets/vocabulary/word2id.json"
 
 PREFIX_TABLE = "model/datasets/candidate/prefix_candidates.json"
 
-INPUT = "model/datasets/processed/test.jsonl"
+INPUT = "model/datasets/processed/train.jsonl"
 
-OUTPUT = "model/datasets/processed/test_v3.jsonl"
+OUTPUT = "model/datasets/processed/train_v3.jsonl"
 
 
 def main():
