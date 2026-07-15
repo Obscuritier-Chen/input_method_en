@@ -1,0 +1,5 @@
+/.vscode
+model/datasets/
+/model/training/__pycache__
+/model/structure/__pycache__
+/model/structure/candidate/__pycache__
