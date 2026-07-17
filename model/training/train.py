@@ -7,6 +7,7 @@ outer_folder=current_file.parent.parent
 if str(outer_folder) not in sys.path:
     sys.path.insert(0, str(outer_folder))
 
+import logging
 import torch
 import torch.nn as nn
 
@@ -26,6 +27,47 @@ from structure.word_vocabulary import WordVocabulary
 
 from structure.collator import collator
 from structure.completion_dataset import CompletionDataset
+
+# -------------------------
+# Checkpoint / Log 路径
+# -------------------------
+
+CHECKPOINT_DIR = Path("model/results/checkpoints")
+LATEST_CHECKPOINT_PATH = CHECKPOINT_DIR / "latest.pt"
+BEST_CHECKPOINT_PATH = CHECKPOINT_DIR / "best.pt"
+
+LOG_DIR = Path("model/results/logs")
+LOG_PATH = LOG_DIR / "train.log"
+
+CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# 判定"最佳"的指标：默认用 valid loss，越低越好
+# 如果想用 top1/mrr 等"越高越好"的指标，把 BEST_METRIC_MODE 改成 "max"
+BEST_METRIC_KEY = "loss"
+BEST_METRIC_MODE = "min"  # "min" 或 "max"
+
+# -------------------------
+# Logger 配置：同时输出到文件和终端
+# -------------------------
+
+logger = logging.getLogger("train")
+logger.setLevel(logging.INFO)
+
+if not logger.handlers:
+
+    file_handler = logging.FileHandler(LOG_PATH, encoding="utf8")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    )
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(
+        logging.Formatter("%(message)s")
+    )
+
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
 
 # -------------------------
 
@@ -88,16 +130,111 @@ valid_dataloader=DataLoader(
                     shuffle=False,
                     collate_fn=collator
                     )
-            
 
-for epoch in range(tr_config.num_epochs):
+# -------------------------
+# 断点恢复
+# -------------------------
+
+start_epoch = 0
+
+if BEST_METRIC_MODE == "min":
+    best_metric = float("inf")
+else:
+    best_metric = float("-inf")
+
+
+def is_better(current, best):
+
+    if BEST_METRIC_MODE == "min":
+
+        return current < best
+
+    else:
+
+        return current > best
+
+
+if LATEST_CHECKPOINT_PATH.exists():
+
+    logger.info(f"Found checkpoint at {LATEST_CHECKPOINT_PATH}, resuming...")
+
+    checkpoint = torch.load(LATEST_CHECKPOINT_PATH, map_location=device)
+
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    start_epoch = checkpoint["epoch"]
+
+    best_metric = checkpoint.get("best_metric", best_metric)
+
+    logger.info(
+        f"Resumed from epoch {start_epoch}, "
+        f"current best {BEST_METRIC_KEY}: {best_metric:.4f}"
+    )
+
+else:
+
+    logger.info("No checkpoint found, starting from scratch.")
+
+# -------------------------
+# 训练循环
+# -------------------------
+
+for epoch in range(start_epoch, tr_config.num_epochs):
 
     train_result = trainer.train_epoch(train_dataloader)
 
     valid_result = trainer.evaluate(valid_dataloader)
 
-    print(f"Epoch {epoch+1}")
+    logger.info(f"Epoch {epoch + 1}/{tr_config.num_epochs}")
 
-    print(train_result)
+    logger.info(
+        "Train | "
+        + " | ".join(f"{k}: {v:.4f}" for k, v in train_result.items())
+    )
 
-    print(valid_result)
+    logger.info(
+        "Valid | "
+        + " | ".join(f"{k}: {v:.4f}" for k, v in valid_result.items())
+    )
+
+    # -------------------------
+    # 保存最新 checkpoint（覆盖上一个 epoch，用于断点恢复）
+    # -------------------------
+
+    current_metric = valid_result[BEST_METRIC_KEY]
+
+    checkpoint_payload = {
+        "epoch": epoch + 1,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "train_result": train_result,
+        "valid_result": valid_result,
+        "best_metric": (
+            current_metric
+            if is_better(current_metric, best_metric)
+            else best_metric
+        ),
+    }
+
+    torch.save(checkpoint_payload, LATEST_CHECKPOINT_PATH)
+
+    logger.info(f"Checkpoint saved to {LATEST_CHECKPOINT_PATH}")
+
+    # -------------------------
+    # 保存最佳 checkpoint（valid 指标更优时才覆盖）
+    # -------------------------
+
+    if is_better(current_metric, best_metric):
+
+        best_metric = current_metric
+
+        torch.save(checkpoint_payload, BEST_CHECKPOINT_PATH)
+
+        logger.info(
+            f"New best {BEST_METRIC_KEY}: {best_metric:.4f}, "
+            f"saved to {BEST_CHECKPOINT_PATH}"
+        )
+
+    logger.info("-" * 60)
