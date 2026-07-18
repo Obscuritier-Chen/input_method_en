@@ -47,6 +47,9 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 BEST_METRIC_KEY = "loss"
 BEST_METRIC_MODE = "min"  # "min" 或 "max"
 
+# iteration 级别保存间隔
+SAVE_INTERVAL = 50_000
+
 # -------------------------
 # Logger 配置：同时输出到文件和终端
 # -------------------------
@@ -101,15 +104,6 @@ optimizer = AdamW(
     weight_decay=1e-2
 )
 
-trainer = Trainer(
-
-    model,
-    optimizer,
-    criterion,
-    device
-
-)
-
 train_dataset=CompletionDataset(r'./model/datasets/processed/train.jsonl',
                             word_vocab,
                             char_vocab)
@@ -132,10 +126,11 @@ valid_dataloader=DataLoader(
                     )
 
 # -------------------------
-# 断点恢复
+# 断点恢复状态
 # -------------------------
 
 start_epoch = 0
+start_skip_batches = 0
 
 if BEST_METRIC_MODE == "min":
     best_metric = float("inf")
@@ -154,6 +149,58 @@ def is_better(current, best):
         return current > best
 
 
+def save_checkpoint(path, epoch, global_step, batch_in_epoch, extra=None):
+
+    payload = {
+        "epoch": epoch,
+        "global_step": global_step,
+        "batch_in_epoch": batch_in_epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "best_metric": best_metric,
+    }
+
+    if extra:
+        payload.update(extra)
+
+    torch.save(payload, path)
+
+
+# -------------------------
+# iteration 级别保存回调，由 Trainer 在 train_epoch 内部按 save_interval 触发
+# -------------------------
+
+def checkpoint_callback(epoch, global_step, batch_in_epoch):
+
+    save_checkpoint(
+        LATEST_CHECKPOINT_PATH,
+        epoch=epoch,
+        global_step=global_step,
+        batch_in_epoch=batch_in_epoch
+    )
+
+    logger.info(
+        f"[step {global_step}] checkpoint saved "
+        f"(epoch {epoch + 1}, batch {batch_in_epoch}) "
+        f"to {LATEST_CHECKPOINT_PATH}"
+    )
+
+
+trainer = Trainer(
+
+    model,
+    optimizer,
+    criterion,
+    device,
+    checkpoint_callback=checkpoint_callback,
+    save_interval=SAVE_INTERVAL
+
+)
+
+# -------------------------
+# 加载 checkpoint（如果存在）
+# -------------------------
+
 if LATEST_CHECKPOINT_PATH.exists():
 
     logger.info(f"Found checkpoint at {LATEST_CHECKPOINT_PATH}, resuming...")
@@ -164,12 +211,23 @@ if LATEST_CHECKPOINT_PATH.exists():
 
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
+    trainer.global_step = checkpoint.get("global_step", 0)
+
     start_epoch = checkpoint["epoch"]
+
+    start_skip_batches = checkpoint.get("batch_in_epoch", 0)
 
     best_metric = checkpoint.get("best_metric", best_metric)
 
+    # 如果上次保存点已经是本 epoch 的最后一个 batch，直接进入下一个 epoch
+    if start_skip_batches >= len(train_dataloader):
+        start_epoch += 1
+        start_skip_batches = 0
+
     logger.info(
-        f"Resumed from epoch {start_epoch}, "
+        f"Resumed at epoch {start_epoch + 1}, "
+        f"batch {start_skip_batches}, "
+        f"global_step {trainer.global_step}, "
         f"current best {BEST_METRIC_KEY}: {best_metric:.4f}"
     )
 
@@ -183,7 +241,13 @@ else:
 
 for epoch in range(start_epoch, tr_config.num_epochs):
 
-    train_result = trainer.train_epoch(train_dataloader)
+    skip_batches = start_skip_batches if epoch == start_epoch else 0
+
+    train_result = trainer.train_epoch(
+        train_dataloader,
+        epoch=epoch,
+        skip_batches=skip_batches
+    )
 
     valid_result = trainer.evaluate(valid_dataloader)
 
@@ -200,37 +264,44 @@ for epoch in range(start_epoch, tr_config.num_epochs):
     )
 
     # -------------------------
-    # 保存最新 checkpoint（覆盖上一个 epoch，用于断点恢复）
+    # epoch 结束：保存 latest（batch_in_epoch = 总长度，
+    # 代表本 epoch 已完整跑完，下次恢复自动进入下一 epoch）
     # -------------------------
 
     current_metric = valid_result[BEST_METRIC_KEY]
 
-    checkpoint_payload = {
-        "epoch": epoch + 1,
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "train_result": train_result,
-        "valid_result": valid_result,
-        "best_metric": (
-            current_metric
-            if is_better(current_metric, best_metric)
-            else best_metric
-        ),
-    }
+    if is_better(current_metric, best_metric):
+        best_metric = current_metric
 
-    torch.save(checkpoint_payload, LATEST_CHECKPOINT_PATH)
+    save_checkpoint(
+        LATEST_CHECKPOINT_PATH,
+        epoch=epoch,
+        global_step=trainer.global_step,
+        batch_in_epoch=len(train_dataloader),
+        extra={
+            "train_result": train_result,
+            "valid_result": valid_result
+        }
+    )
 
-    logger.info(f"Checkpoint saved to {LATEST_CHECKPOINT_PATH}")
+    logger.info(f"Epoch checkpoint saved to {LATEST_CHECKPOINT_PATH}")
 
     # -------------------------
     # 保存最佳 checkpoint（valid 指标更优时才覆盖）
     # -------------------------
 
-    if is_better(current_metric, best_metric):
+    if is_better(current_metric, best_metric) or current_metric == best_metric:
 
-        best_metric = current_metric
-
-        torch.save(checkpoint_payload, BEST_CHECKPOINT_PATH)
+        save_checkpoint(
+            BEST_CHECKPOINT_PATH,
+            epoch=epoch,
+            global_step=trainer.global_step,
+            batch_in_epoch=len(train_dataloader),
+            extra={
+                "train_result": train_result,
+                "valid_result": valid_result
+            }
+        )
 
         logger.info(
             f"New best {BEST_METRIC_KEY}: {best_metric:.4f}, "

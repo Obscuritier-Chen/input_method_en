@@ -13,7 +13,9 @@ class Trainer:
         model,
         optimizer,
         criterion,
-        device
+        device,
+        checkpoint_callback=None,   # 新增：每 save_interval 个 step 调用一次
+        save_interval=50_000        # 新增：iteration 级别保存间隔
     ):
 
         self.model = model.to(device)
@@ -21,9 +23,16 @@ class Trainer:
         self.criterion = criterion
         self.device = device
 
+        self.checkpoint_callback = checkpoint_callback
+        self.save_interval = save_interval
+
+        self.global_step = 0  # 跨 epoch 累计，断点恢复时从外部赋值恢复
+
     def train_epoch(
         self,
-        dataloader
+        dataloader,
+        epoch=0,
+        skip_batches=0
     ):
 
         self.model.train()
@@ -33,10 +42,15 @@ class Trainer:
         progress = tqdm(
             dataloader,
             desc="Training",
-            leave=False
+            leave=False,
+            initial=skip_batches,
+            total=len(dataloader)
         )
 
-        for batch in progress:
+        for batch_idx, batch in enumerate(progress):
+
+            if batch_idx < skip_batches:
+                continue
 
             context_ids = batch["context_ids"].to(self.device)
 
@@ -76,6 +90,23 @@ class Trainer:
             )
 
             metrics.update_latency(elapsed_time)
+
+            self.global_step += 1
+
+            # ------------------------
+            # iteration 级别保存
+            # ------------------------
+
+            if (
+                self.checkpoint_callback is not None
+                and self.global_step % self.save_interval == 0
+            ):
+
+                self.checkpoint_callback(
+                    epoch=epoch,
+                    global_step=self.global_step,
+                    batch_in_epoch=batch_idx + 1
+                )
 
             progress.set_postfix(
                 loss=loss.item()
