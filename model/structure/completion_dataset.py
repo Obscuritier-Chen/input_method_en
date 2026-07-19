@@ -65,7 +65,7 @@ class CompletionDataset(Dataset):
 
         offset=self.offsets[idx]
 
-        with open(self.jsonl_path, 'r', encoding='utf-8') as f:
+        with open(self.jsonl_path, 'rb') as f:
             f.seek(offset)
             line=f.readline()
             sample=json.loads(line)

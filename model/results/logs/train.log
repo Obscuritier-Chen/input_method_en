@@ -1,2 +1,26 @@
 2026-07-17 22:07:14,489 [INFO] No checkpoint found, starting from scratch.
 2026-07-17 22:22:45,697 [INFO] No checkpoint found, starting from scratch.
+2026-07-18 11:01:31,403 [INFO] No checkpoint found, starting from scratch.
+2026-07-18 13:25:36,669 [INFO] [step 50000] checkpoint saved (epoch 1, batch 50000) to model\results\checkpoints\latest.pt
+2026-07-18 15:48:10,676 [INFO] [step 100000] checkpoint saved (epoch 1, batch 100000) to model\results\checkpoints\latest.pt
+2026-07-18 18:13:58,279 [INFO] [step 150000] checkpoint saved (epoch 1, batch 150000) to model\results\checkpoints\latest.pt
+2026-07-18 20:37:36,427 [INFO] [step 200000] checkpoint saved (epoch 1, batch 200000) to model\results\checkpoints\latest.pt
+2026-07-18 23:01:55,939 [INFO] [step 250000] checkpoint saved (epoch 1, batch 250000) to model\results\checkpoints\latest.pt
+2026-07-19 01:25:42,523 [INFO] [step 300000] checkpoint saved (epoch 1, batch 300000) to model\results\checkpoints\latest.pt
+2026-07-19 03:49:22,546 [INFO] [step 350000] checkpoint saved (epoch 1, batch 350000) to model\results\checkpoints\latest.pt
+2026-07-19 06:12:22,027 [INFO] [step 400000] checkpoint saved (epoch 1, batch 400000) to model\results\checkpoints\latest.pt
+2026-07-19 08:35:34,585 [INFO] [step 450000] checkpoint saved (epoch 1, batch 450000) to model\results\checkpoints\latest.pt
+2026-07-19 10:58:31,609 [INFO] [step 500000] checkpoint saved (epoch 1, batch 500000) to model\results\checkpoints\latest.pt
+2026-07-19 13:22:05,232 [INFO] [step 550000] checkpoint saved (epoch 1, batch 550000) to model\results\checkpoints\latest.pt
+2026-07-19 15:45:00,609 [INFO] [step 600000] checkpoint saved (epoch 1, batch 600000) to model\results\checkpoints\latest.pt
+2026-07-19 16:43:16,755 [INFO] Epoch 1/5
+2026-07-19 16:43:16,755 [INFO] Train | loss: 2.2523 | top1: 0.5940 | top5: 0.8091 | mrr: 0.6897 | latency_ms: 0.0833 | throughput: 11998.9385
+2026-07-19 16:43:16,755 [INFO] Valid | loss: 2.2041 | top1: 0.6111 | top5: 0.8198 | mrr: 0.7041 | latency_ms: 0.0219 | throughput: 45594.0946
+2026-07-19 16:43:19,151 [INFO] Epoch checkpoint saved to model\results\checkpoints\latest.pt
+2026-07-19 16:43:21,348 [INFO] New best loss: 2.2041, saved to model\results\checkpoints\best.pt
+2026-07-19 16:43:21,348 [INFO] ------------------------------------------------------------
+2026-07-19 18:16:34,455 [INFO] [step 650000] checkpoint saved (epoch 2, batch 32529) to model\results\checkpoints\latest.pt
+2026-07-19 20:39:14,268 [INFO] [step 700000] checkpoint saved (epoch 2, batch 82529) to model\results\checkpoints\latest.pt
+2026-07-19 23:01:30,360 [INFO] [step 750000] checkpoint saved (epoch 2, batch 132529) to model\results\checkpoints\latest.pt
+2026-07-19 23:15:39,030 [INFO] Found checkpoint at model\results\checkpoints\latest.pt, resuming...
+2026-07-19 23:15:40,746 [INFO] Resumed at epoch 2, batch 132529, global_step 750000, current best loss: 2.2041
