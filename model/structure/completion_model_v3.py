@@ -1,30 +1,37 @@
 import torch.nn as nn
 
+from .position_encoding import PositionalEncoding
+from .word_embedding import WordEmbedding
+from .embedding_builder_v3 import EmbeddingBuilderV3
+from .transformer_encoder_v3 import TransformerEncoderV3
+from .context_projection import ContextProjection
+from .prediction_head_v3 import PredictionHeadV3
+
 
 class CompletionModelV3(nn.Module):
 
-    def __init__(
-        self,
-        embedding_builder,
-        transformer_encoder,
-        context_projection,
-        prediction_head
-    ):
+    def __init__(self,config):
 
         super().__init__()
 
-        self.embedding_builder = embedding_builder
+        word_embedding=WordEmbedding(config)
+        positional_encoding=PositionalEncoding(config)
 
-        self.transformer_encoder = transformer_encoder
+        self.embedding_builder=EmbeddingBuilderV3(
+            word_embedding,
+            positional_encoding,
+            config,                           
+        )
 
-        self.context_projection = context_projection
-
-        self.prediction_head = prediction_head
+        self.transformer_encoder=TransformerEncoderV3(config)
+        self.context_projection = ContextProjection(config)
+        self.prediction_head = PredictionHeadV3()
 
     def forward(
         self,
         context_ids,
-        candidate_ids
+        candidate_ids,
+        candidate_mask
     ):
         """
         Parameters
@@ -95,7 +102,9 @@ class CompletionModelV3(nn.Module):
 
             context_vector,
 
-            candidate_embedding
+            candidate_embedding,
+
+            candidate_mask
 
         )
 

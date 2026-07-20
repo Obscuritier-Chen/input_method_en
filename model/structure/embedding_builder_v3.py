@@ -8,7 +8,7 @@ class EmbeddingBuilderV3(nn.Module):
         self,
         word_embedding,
         position_embedding,
-        embedding_dim
+        config
     ):
 
         super().__init__()
@@ -26,7 +26,7 @@ class EmbeddingBuilderV3(nn.Module):
             torch.randn(
                 1,
                 1,
-                embedding_dim
+                config.embedding_dim
             )
 
         )
@@ -98,31 +98,8 @@ class EmbeddingBuilderV3(nn.Module):
         # 长度为 L+1 的位置编码。
         ##################################################
 
-        dummy_cls = torch.zeros(
-            batch_size,
-            1,
-            dtype=context_ids.dtype,
-            device=context_ids.device
-        )
-
-        position_ids = torch.cat(
-            [
-                dummy_cls,
-                context_ids
-            ],
-            dim=1
-        )
-
-        context_embedding = (
-
+        context_embedding = self.position_embedding(
             context_embedding
-
-            +
-
-            self.position_embedding(
-                position_ids
-            )
-
         )
 
         ##################################################

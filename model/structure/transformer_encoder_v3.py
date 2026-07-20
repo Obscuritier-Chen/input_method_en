@@ -2,28 +2,24 @@ import torch
 import torch.nn as nn
 
 
-class TransformerEncoder(nn.Module):
+class TransformerEncoderV3(nn.Module):
 
     def __init__(
         self,
-        embedding_dim,
-        num_heads,
-        hidden_dim,
-        num_layers,
-        dropout=0.1
+        config
     ):
 
         super().__init__()
 
         encoder_layer = nn.TransformerEncoderLayer(
 
-            d_model=embedding_dim,
+            d_model=config.embedding_dim,
 
-            nhead=num_heads,
+            nhead=config.num_heads,
 
-            dim_feedforward=hidden_dim,
+            dim_feedforward=config.hidden_dim,
 
-            dropout=dropout,
+            dropout=config.dropout,
 
             activation="gelu",
 
@@ -35,7 +31,7 @@ class TransformerEncoder(nn.Module):
 
             encoder_layer,
 
-            num_layers=num_layers
+            num_layers=config.num_layers
 
         )
 

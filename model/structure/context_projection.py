@@ -5,10 +5,12 @@ class ContextProjection(nn.Module):
 
     def __init__(
         self,
-        embedding_dim,
-        dropout=0.1
+        config,
     ):
         super().__init__()
+
+        embedding_dim=config.embedding_dim
+        dropout=config.dropout
 
         self.projection = nn.Sequential(
 
