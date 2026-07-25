@@ -117,18 +117,6 @@ class MetricsV3:
             ranks.float()
 
         ).mean().item()
-        
-        ##################################################
-        # Mean Rank
-        ##################################################
-
-        result["mean_rank"] = (
-
-            ranks.mean()
-
-            .item()
-
-        )
 
 
         return result
