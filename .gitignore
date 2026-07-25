@@ -4,3 +4,4 @@ model/datasets/
 /model/structure/__pycache__
 /model/structure/candidate/__pycache__
 /model/results/checkpoints/
+/model/results/models/
