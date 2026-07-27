@@ -6,3 +6,9 @@ model/datasets/
 /model/results/checkpoints/
 /model/results/checkpoints_v3/
 /model/results/models/
+software/model/*
+software/target/*
+*.exe
+*.msi
+*.dll
+*.pdb
