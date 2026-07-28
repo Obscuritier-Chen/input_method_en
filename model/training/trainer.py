@@ -3,7 +3,7 @@ from tqdm import tqdm
 from torch.nn.utils import clip_grad_norm_
 import time
 
-from metrics import Metrics
+from .metrics import Metrics
 
 
 class Trainer:
