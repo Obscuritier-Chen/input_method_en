@@ -1,1 +1,91 @@
 2026-07-20 21:49:57,814 [INFO] No checkpoint found, starting from scratch.
+2026-07-24 22:19:00,685 [INFO] No checkpoint found, starting from scratch.
+2026-07-24 23:37:25,454 [INFO] [step 50000] loss 1.6912 | checkpoint saved (epoch 1, batch 50000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 00:54:39,739 [INFO] [step 100000] loss 1.4301 | checkpoint saved (epoch 1, batch 100000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 02:11:53,819 [INFO] [step 150000] loss 1.3409 | checkpoint saved (epoch 1, batch 150000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 03:29:27,379 [INFO] [step 200000] loss 1.5407 | checkpoint saved (epoch 1, batch 200000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 04:46:38,744 [INFO] [step 250000] loss 1.2552 | checkpoint saved (epoch 1, batch 250000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 06:04:08,965 [INFO] [step 300000] loss 1.3525 | checkpoint saved (epoch 1, batch 300000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 07:21:33,860 [INFO] [step 350000] loss 1.2723 | checkpoint saved (epoch 1, batch 350000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 08:38:58,166 [INFO] [step 400000] loss 1.1307 | checkpoint saved (epoch 1, batch 400000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 09:56:18,292 [INFO] [step 450000] loss 1.3046 | checkpoint saved (epoch 1, batch 450000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 11:13:29,526 [INFO] [step 500000] loss 1.1402 | checkpoint saved (epoch 1, batch 500000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 12:30:45,206 [INFO] [step 550000] loss 0.9036 | checkpoint saved (epoch 1, batch 550000) to model\results\checkpoints_v3\latest.pt
+2026-07-25 13:43:14,566 [INFO] Found checkpoint at model\results\checkpoints_v3\latest.pt, resuming...
+2026-07-25 13:43:15,524 [INFO] Resumed at epoch 1, batch 550000, global_step 550000, current best loss: inf
+2026-07-25 15:13:26,499 [INFO] Epoch 1/5
+2026-07-25 15:13:26,499 [INFO] Train | loss: 0.0486
+2026-07-25 15:13:26,499 [INFO] Valid | top1_acc: 0.6851 | top5_acc: 0.9130 | top10_acc: 0.9551 | mrr: 0.7856 | mean_rank: 2.6389 | loss: 1.1263 | latency_ms: 0.0385
+2026-07-25 15:13:27,787 [INFO] Epoch checkpoint saved to model\results\checkpoints_v3\latest.pt
+2026-07-25 15:13:28,952 [INFO] New best loss: 1.1263, saved to model\results\checkpoints_v3\best.pt
+2026-07-25 15:13:28,952 [INFO] ------------------------------------------------------------
+2026-07-25 15:57:39,501 [INFO] [step 600000] loss 0.8777 | checkpoint saved (epoch 2, batch 26189) to model\results\checkpoints_v3\latest.pt
+2026-07-25 17:18:44,037 [INFO] [step 650000] loss 1.0678 | checkpoint saved (epoch 2, batch 76189) to model\results\checkpoints_v3\latest.pt
+2026-07-25 18:40:12,850 [INFO] [step 700000] loss 1.1499 | checkpoint saved (epoch 2, batch 126189) to model\results\checkpoints_v3\latest.pt
+2026-07-25 20:02:05,089 [INFO] [step 750000] loss 1.0332 | checkpoint saved (epoch 2, batch 176189) to model\results\checkpoints_v3\latest.pt
+2026-07-25 21:22:37,508 [INFO] [step 800000] loss 1.0989 | checkpoint saved (epoch 2, batch 226189) to model\results\checkpoints_v3\latest.pt
+2026-07-25 22:43:06,849 [INFO] [step 850000] loss 1.1878 | checkpoint saved (epoch 2, batch 276189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 00:03:12,288 [INFO] [step 900000] loss 1.0487 | checkpoint saved (epoch 2, batch 326189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 01:22:05,652 [INFO] [step 950000] loss 1.1616 | checkpoint saved (epoch 2, batch 376189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 02:40:28,123 [INFO] [step 1000000] loss 1.0237 | checkpoint saved (epoch 2, batch 426189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 03:59:56,826 [INFO] [step 1050000] loss 0.9945 | checkpoint saved (epoch 2, batch 476189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 05:18:42,913 [INFO] [step 1100000] loss 1.0699 | checkpoint saved (epoch 2, batch 526189) to model\results\checkpoints_v3\latest.pt
+2026-07-26 06:34:34,968 [INFO] Epoch 2/5
+2026-07-26 06:34:34,968 [INFO] Train | loss: 1.1209
+2026-07-26 06:34:34,969 [INFO] Valid | top1_acc: 0.7046 | top5_acc: 0.9240 | top10_acc: 0.9627 | mrr: 0.8013 | mean_rank: 2.4170 | loss: 1.0454 | latency_ms: 0.0380
+2026-07-26 06:34:36,132 [INFO] Epoch checkpoint saved to model\results\checkpoints_v3\latest.pt
+2026-07-26 06:34:37,286 [INFO] New best loss: 1.0454, saved to model\results\checkpoints_v3\best.pt
+2026-07-26 06:34:37,286 [INFO] ------------------------------------------------------------
+2026-07-26 06:38:37,883 [INFO] [step 1150000] loss 1.1120 | checkpoint saved (epoch 3, batch 2378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 07:57:57,594 [INFO] [step 1200000] loss 0.9919 | checkpoint saved (epoch 3, batch 52378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 09:16:43,500 [INFO] [step 1250000] loss 1.1836 | checkpoint saved (epoch 3, batch 102378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 10:35:36,104 [INFO] [step 1300000] loss 0.9675 | checkpoint saved (epoch 3, batch 152378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 11:54:06,268 [INFO] [step 1350000] loss 1.2604 | checkpoint saved (epoch 3, batch 202378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 13:12:32,449 [INFO] [step 1400000] loss 1.0882 | checkpoint saved (epoch 3, batch 252378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 14:31:02,164 [INFO] [step 1450000] loss 1.2870 | checkpoint saved (epoch 3, batch 302378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 15:49:32,502 [INFO] [step 1500000] loss 0.8665 | checkpoint saved (epoch 3, batch 352378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 17:08:15,907 [INFO] [step 1550000] loss 1.0529 | checkpoint saved (epoch 3, batch 402378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 18:27:14,041 [INFO] [step 1600000] loss 0.9125 | checkpoint saved (epoch 3, batch 452378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 19:46:04,148 [INFO] [step 1650000] loss 1.1396 | checkpoint saved (epoch 3, batch 502378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 21:05:06,308 [INFO] [step 1700000] loss 1.0617 | checkpoint saved (epoch 3, batch 552378) to model\results\checkpoints_v3\latest.pt
+2026-07-26 21:39:54,320 [INFO] Epoch 3/5
+2026-07-26 21:39:54,320 [INFO] Train | loss: 1.0643
+2026-07-26 21:39:54,320 [INFO] Valid | top1_acc: 0.7135 | top5_acc: 0.9294 | top10_acc: 0.9660 | mrr: 0.8084 | mean_rank: 2.3199 | loss: 1.0084 | latency_ms: 0.0378
+2026-07-26 21:39:55,481 [INFO] Epoch checkpoint saved to model\results\checkpoints_v3\latest.pt
+2026-07-26 21:39:56,638 [INFO] New best loss: 1.0084, saved to model\results\checkpoints_v3\best.pt
+2026-07-26 21:39:56,639 [INFO] ------------------------------------------------------------
+2026-07-26 22:25:40,844 [INFO] [step 1750000] loss 1.0500 | checkpoint saved (epoch 4, batch 28567) to model\results\checkpoints_v3\latest.pt
+2026-07-26 23:44:20,904 [INFO] [step 1800000] loss 1.0089 | checkpoint saved (epoch 4, batch 78567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 01:02:54,902 [INFO] [step 1850000] loss 1.1716 | checkpoint saved (epoch 4, batch 128567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 02:21:12,584 [INFO] [step 1900000] loss 1.0713 | checkpoint saved (epoch 4, batch 178567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 03:40:07,503 [INFO] [step 1950000] loss 1.0116 | checkpoint saved (epoch 4, batch 228567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 04:58:23,084 [INFO] [step 2000000] loss 1.1872 | checkpoint saved (epoch 4, batch 278567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 06:16:42,765 [INFO] [step 2050000] loss 0.9447 | checkpoint saved (epoch 4, batch 328567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 07:35:09,476 [INFO] [step 2100000] loss 0.8762 | checkpoint saved (epoch 4, batch 378567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 08:53:28,157 [INFO] [step 2150000] loss 1.2517 | checkpoint saved (epoch 4, batch 428567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 10:11:48,354 [INFO] [step 2200000] loss 1.1181 | checkpoint saved (epoch 4, batch 478567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 11:30:21,903 [INFO] [step 2250000] loss 0.8253 | checkpoint saved (epoch 4, batch 528567) to model\results\checkpoints_v3\latest.pt
+2026-07-27 12:42:08,071 [INFO] Epoch 4/5
+2026-07-27 12:42:08,071 [INFO] Train | loss: 1.0351
+2026-07-27 12:42:08,071 [INFO] Valid | top1_acc: 0.7187 | top5_acc: 0.9317 | top10_acc: 0.9675 | mrr: 0.8123 | mean_rank: 2.2793 | loss: 0.9895 | latency_ms: 0.0380
+2026-07-27 12:42:09,228 [INFO] Epoch checkpoint saved to model\results\checkpoints_v3\latest.pt
+2026-07-27 12:42:10,386 [INFO] New best loss: 0.9895, saved to model\results\checkpoints_v3\best.pt
+2026-07-27 12:42:10,387 [INFO] ------------------------------------------------------------
+2026-07-27 12:49:56,842 [INFO] [step 2300000] loss 1.1767 | checkpoint saved (epoch 5, batch 4756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 14:08:22,550 [INFO] [step 2350000] loss 0.9994 | checkpoint saved (epoch 5, batch 54756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 15:26:23,801 [INFO] [step 2400000] loss 0.9195 | checkpoint saved (epoch 5, batch 104756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 16:44:34,194 [INFO] [step 2450000] loss 0.9461 | checkpoint saved (epoch 5, batch 154756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 18:02:56,783 [INFO] [step 2500000] loss 1.0953 | checkpoint saved (epoch 5, batch 204756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 19:21:03,483 [INFO] [step 2550000] loss 1.0670 | checkpoint saved (epoch 5, batch 254756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 20:39:12,512 [INFO] [step 2600000] loss 1.0253 | checkpoint saved (epoch 5, batch 304756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 21:57:18,340 [INFO] [step 2650000] loss 0.6256 | checkpoint saved (epoch 5, batch 354756) to model\results\checkpoints_v3\latest.pt
+2026-07-27 23:15:26,755 [INFO] [step 2700000] loss 1.0367 | checkpoint saved (epoch 5, batch 404756) to model\results\checkpoints_v3\latest.pt
+2026-07-28 00:33:38,733 [INFO] [step 2750000] loss 0.9771 | checkpoint saved (epoch 5, batch 454756) to model\results\checkpoints_v3\latest.pt
+2026-07-28 01:51:43,000 [INFO] [step 2800000] loss 0.8974 | checkpoint saved (epoch 5, batch 504756) to model\results\checkpoints_v3\latest.pt
+2026-07-28 03:10:01,081 [INFO] [step 2850000] loss 1.0948 | checkpoint saved (epoch 5, batch 554756) to model\results\checkpoints_v3\latest.pt
+2026-07-28 03:41:13,830 [INFO] Epoch 5/5
+2026-07-28 03:41:13,831 [INFO] Train | loss: 1.0176
+2026-07-28 03:41:13,831 [INFO] Valid | top1_acc: 0.7225 | top5_acc: 0.9339 | top10_acc: 0.9685 | mrr: 0.8154 | mean_rank: 2.2423 | loss: 0.9755 | latency_ms: 0.0380
+2026-07-28 03:41:14,993 [INFO] Epoch checkpoint saved to model\results\checkpoints_v3\latest.pt
+2026-07-28 03:41:16,149 [INFO] New best loss: 0.9755, saved to model\results\checkpoints_v3\best.pt
+2026-07-28 03:41:16,149 [INFO] ------------------------------------------------------------
