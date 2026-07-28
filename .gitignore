@@ -12,3 +12,4 @@ software/target/*
 *.msi
 *.dll
 *.pdb
+model_export/output
