@@ -1,4 +1,11 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod vocabulary;
+mod candidate_index;
+mod inference;
+
+pub use vocabulary::WordVocabulary;
+pub use candidate_index::CandidateIndex;
+pub use inference::{Candidate, Predictor};
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
