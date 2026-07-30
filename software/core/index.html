@@ -1,43 +1,49 @@
 <!doctype html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
-    <script type="module" src="/src/main.ts" defer></script>
+    <title>IME Core Service - Debug</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 40px;
+        background: #1e1e1e;
+        color: #ddd;
+      }
+      #editor {
+        width: 100%;
+        font-size: 18px;
+        padding: 10px;
+        background: #2d2d2d;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 6px;
+      }
+      #candidates {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .candidate {
+        padding: 6px 12px;
+        background: #3a3a3a;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .candidate .score {
+        color: #888;
+        margin-left: 6px;
+        font-size: 12px;
+      }
+    </style>
   </head>
-
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+    <h2>候选词调试面板</h2>
+    <p>输入一句话，最后一个（未完成的）词会被当作 prefix 查询候选</p>
+    <input id="editor" type="text" placeholder="i am going to the sch" />
+    <div id="candidates"></div>
 
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
-
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
