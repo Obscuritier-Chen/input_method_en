@@ -10,6 +10,15 @@ pub struct CandidateIndex {
 
 impl CandidateIndex {
 
+    pub fn load_binary(path: impl AsRef<Path>) -> Result<Self> {
+
+        let bytes = fs::read(path)?;
+
+        let table: HashMap<String, Vec<i64>> = bincode::deserialize(&bytes)?;
+
+        Ok(Self { table })
+    }
+
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
 
         let text = fs::read_to_string(path)?;

@@ -9,8 +9,8 @@ fn main() -> anyhow::Result<()> {
 
     let vocab = WordVocabulary::load("../../../model/datasets/vocabulary/word2id.json")?;
 
-    let candidate_index = CandidateIndex::load(
-        "../../../model/datasets/candidate/prefix_candidates.json"
+    let candidate_index = CandidateIndex::load_binary(
+        "../../../model/datasets/candidate/prefix_candidates.bin"
     )?;
 
     let mut predictor = Predictor::load(
@@ -24,8 +24,8 @@ fn main() -> anyhow::Result<()> {
     // 模拟一次真实输入：左侧上下文 + 用户正在打的前缀
     // -------------------------
 
-    let context_words = ["i", "am", "a", "fucking"];
-    let prefix = "id";  // 假设正在打 "school"
+    let context_words = ["After", "months", "of", "private"];
+    let prefix = "neg";
 
     let context_ids = vocab.encode(&context_words);
 
