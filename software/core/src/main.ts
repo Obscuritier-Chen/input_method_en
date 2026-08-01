@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface CandidateDto {
   word: string;
@@ -37,22 +38,33 @@ async function updateCandidates() {
   const { context, prefix } = splitContextAndPrefix(editor.value);
 
   if (prefix.length === 0) {
-    candidatesEl.innerHTML = "";
+    await invoke("hide_candidates_window");
     return;
   }
 
   try {
 
-    const results = await invoke<CandidateDto[]>("get_candidates", {
-      context,
-      prefix,
-    });
+    const results = await invoke<CandidateDto[]>("get_candidates", { context, prefix });
 
-    renderCandidates(results);
+    if (results.length === 0) {
+      await invoke("hide_candidates_window");
+      return;
+    }
+
+    // 把输入框在屏幕上的物理坐标算出来，告诉候选窗口该出现在哪
+    const mainWin = getCurrentWindow();
+    const winPos = await mainWin.outerPosition();
+    const scaleFactor = await mainWin.scaleFactor();
+    const rect = editor.getBoundingClientRect();
+
+    const x = winPos.x + rect.left * scaleFactor;
+    const y = winPos.y + rect.bottom * scaleFactor + 4;
+
+    await invoke("show_candidates_window", { x, y, candidates: results });
 
   } catch (err) {
 
-    candidatesEl.innerHTML = `<span style="color:#f66">${err}</span>`;
+    console.error(err);
 
   }
 }
