@@ -2,12 +2,14 @@ mod vocabulary;
 mod candidate_index;
 mod inference;
 
+pub use vocabulary::WordVocabulary;
+pub use candidate_index::CandidateIndex;
+pub use inference::{Predictor, Candidate};
+
 use std::path::Path;
 use std::sync::Mutex;
 
-pub use vocabulary::WordVocabulary;
-pub use candidate_index::CandidateIndex;
-pub use inference::Predictor;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter};
 
 struct AppState {
     vocab: WordVocabulary,
@@ -15,7 +17,7 @@ struct AppState {
     predictor: Mutex<Predictor>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 struct CandidateDto {
     word: String,
     score: f32,
@@ -41,10 +43,7 @@ fn get_candidates(
         return Ok(vec![]);
     }
 
-    let mut predictor = state
-        .predictor
-        .lock()
-        .map_err(|e| e.to_string())?;
+    let mut predictor = state.predictor.lock().map_err(|e| e.to_string())?;
 
     let results = predictor
         .predict(&context_ids, &candidate_ids, &state.vocab, 10)
@@ -56,30 +55,62 @@ fn get_candidates(
         .collect())
 }
 
+#[tauri::command]
+fn show_candidates_window(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+    candidates: Vec<CandidateDto>,
+) -> Result<(), String> {
+
+    let window = app
+        .get_webview_window("candidates")
+        .ok_or("candidate window not found")?;
+
+    window
+        .set_position(tauri::PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+
+    window
+        .emit("candidates-updated", &candidates)
+        .map_err(|e| e.to_string())?;
+
+    window.show().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn hide_candidates_window(app: tauri::AppHandle) -> Result<(), String> {
+
+    if let Some(window) = app.get_webview_window("candidates") {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn on_candidate_selected(word: String) -> Result<(), String> {
+
+    // 暂时只打印，真正“提交进目标应用”的逻辑要等 TSF 接入后再实现
+    println!("用户选中了候选词: {word}");
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 
-    // 用 CARGO_MANIFEST_DIR 拼绝对路径，避免 `tauri dev` 运行时工作目录
-    // 和你预期不一致导致相对路径找不到文件
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
-    let vocab_path = Path::new(manifest_dir)
-        .join("../../../model/datasets/vocabulary/word2id.json");
+    let vocab_path = Path::new(manifest_dir).join("../../../model/datasets/vocabulary/word2id.json");
+    let candidate_path = Path::new(manifest_dir).join("../../../model/datasets/candidate/prefix_candidates.bin");
+    let onnx_path = Path::new(manifest_dir).join("../../../model_export/output/completion_model_v3.onnx");
 
-    let candidate_path = Path::new(manifest_dir)
-        .join("../../../model/datasets/candidate/prefix_candidates.bin");
-
-    let onnx_path = Path::new(manifest_dir)
-        .join("../../../model_export/output/completion_model_v3.onnx");
-
-    let vocab = WordVocabulary::load(&vocab_path)
-        .expect("加载 word2id.json 失败");
-
-    let candidates = CandidateIndex::load_binary(&candidate_path)
-        .expect("加载 prefix_candidates.bin 失败");
-
-    let predictor = Predictor::load(&onnx_path)
-        .expect("加载 ONNX 模型失败");
+    let vocab = WordVocabulary::load(&vocab_path).expect("加载 word2id.json 失败");
+    let candidates = CandidateIndex::load_binary(&candidate_path).expect("加载 prefix_candidates.bin 失败");
+    let predictor = Predictor::load(&onnx_path).expect("加载 ONNX 模型失败");
 
     tauri::Builder::default()
         .manage(AppState {
@@ -87,7 +118,27 @@ pub fn run() {
             candidates,
             predictor: Mutex::new(predictor),
         })
-        .invoke_handler(tauri::generate_handler![get_candidates])
+        .setup(|app| {
+
+            WebviewWindowBuilder::new(app, "candidates", WebviewUrl::App("candidate.html".into()))
+                .decorations(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .transparent(true)
+                .shadow(false)
+                .resizable(false)
+                .visible(false)
+                .inner_size(200.0, 40.0)
+                .build()?;
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_candidates,
+            show_candidates_window,
+            hide_candidates_window,
+            on_candidate_selected
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
