@@ -3,6 +3,7 @@ mod guids;
 mod text_service;
 mod class_factory;
 mod registration;
+mod edit_session;
 
 use windows::core::{HRESULT, GUID};
 use windows::Win32::Foundation::{HMODULE, S_OK, CLASS_E_CLASSNOTAVAILABLE, S_FALSE};
@@ -12,8 +13,17 @@ use windows::Win32::Foundation::HINSTANCE;
 
 static DLL_INSTANCE: AtomicIsize = AtomicIsize::new(0);
 
+use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
+use windows::core::PCWSTR;
+
+fn dbg(msg: &str) {
+    let wide: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe { OutputDebugStringW(PCWSTR(wide.as_ptr())) };
+}
+
 #[no_mangle]
 extern "system" fn DllMain(hinstance: HINSTANCE, _reason: u32, _reserved: *mut core::ffi::c_void) -> i32 {
+    dbg("DllMain called");
     DLL_INSTANCE.store(hinstance.0 as isize, Ordering::SeqCst);
     1 // TRUE
 }

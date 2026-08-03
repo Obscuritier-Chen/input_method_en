@@ -13,20 +13,34 @@ use windows::Win32::System::Registry::{
 use windows::Win32::UI::TextServices::{
     ITfInputProcessorProfiles, ITfCategoryMgr,
     CLSID_TF_InputProcessorProfiles, CLSID_TF_CategoryMgr,
-    GUID_TFCAT_TIP_KEYBOARD,
+    GUID_TFCAT_TIP_KEYBOARD, GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
 };
 
 use crate::guids::{CLSID_TEXT_SERVICE, GUID_PROFILE};
 use crate::dll_module;
 
+// 🎯 补全 Immersive App (UWP/Win11设置界面) 支持分类 GUID
+// GUID: {48678036-264D-4A23-AE27-2FA77469B46C}
+const GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT: GUID = GUID::from_u128(0x48678036_264d_4a23_ae27_2fa77469b46c);
+
 const LANGID_EN_US: u16 = 0x0409;
 const SERVICE_DESC: &str = "My English IME";
 
-fn clsid_to_reg_key(clsid: &GUID) -> String {
-    format!("CLSID\\{{{:?}}}", clsid) // 见下方注意事项
+/// 修复：正确格式化 GUID 为标准的标准注册表路径字符串
+fn format_guid(guid: &GUID) -> String {
+    format!(
+        "{{{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+        guid.data1, guid.data2, guid.data3,
+        guid.data4[0], guid.data4[1], guid.data4[2], guid.data4[3],
+        guid.data4[4], guid.data4[5], guid.data4[6], guid.data4[7],
+    )
 }
 
-/// 获取本 DLL 自身的完整路径,写进 InprocServer32
+fn clsid_to_reg_key(clsid: &GUID) -> String {
+    format!("CLSID\\{}", format_guid(clsid))
+}
+
+/// 获取本 DLL 自身的完整路径
 fn dll_path() -> Result<Vec<u16>> {
     let mut buf = vec![0u16; MAX_PATH as usize];
     let len = unsafe { GetModuleFileNameW(dll_module(), &mut buf) };
@@ -91,7 +105,7 @@ fn register_clsid() -> Result<()> {
 }
 
 fn unregister_clsid() -> Result<()> {
-    let clsid_key = to_wide(&format!("CLSID\\{{{:?}}}", CLSID_TEXT_SERVICE));
+    let clsid_key = to_wide(&clsid_to_reg_key(&CLSID_TEXT_SERVICE));
     unsafe {
         let _ = RegDeleteTreeW(HKEY_CLASSES_ROOT, PCWSTR(clsid_key.as_ptr()));
     }
@@ -105,17 +119,32 @@ pub fn register() -> Result<()> {
         register_clsid()?;
 
         unsafe {
-            // 1. 注册 category:告诉 TSF 这是一个键盘类输入法
             let category_mgr: ITfCategoryMgr =
                 CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)?;
+
+            // 1. 注册基础 Category: 声明为键盘输入法
             category_mgr.RegisterCategory(
                 &CLSID_TEXT_SERVICE,
                 &GUID_TFCAT_TIP_KEYBOARD,
                 &CLSID_TEXT_SERVICE,
             )?;
 
-            // 2. 注册语言 profile:告诉 TSF 这个输入法用于 en-US,
-            //    并关联一个 GUID_PROFILE 供语言栏/设置界面识别
+            // 2. 🎯 核心修复：注册 Immersive Support Category
+            // 告诉 Windows 设置和 Modern 应用，此输入法可以在全局（包括设置界面）激活，消除灰色“仅桌面”状态
+            category_mgr.RegisterCategory(
+                &CLSID_TEXT_SERVICE,
+                &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                &CLSID_TEXT_SERVICE,
+            )?;
+
+            // 3. 注册 Display Attribute Provider（推荐）
+            category_mgr.RegisterCategory(
+                &CLSID_TEXT_SERVICE,
+                &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+                &CLSID_TEXT_SERVICE,
+            )?;
+
+            // 4. 注册语言 profile
             let profiles: ITfInputProcessorProfiles =
                 CoCreateInstance(&CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER)?;
 
@@ -152,9 +181,23 @@ pub fn unregister() -> Result<()> {
 
             let category_mgr: ITfCategoryMgr =
                 CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)?;
+
+            // 卸载所有 Category
             category_mgr.UnregisterCategory(
                 &CLSID_TEXT_SERVICE,
                 &GUID_TFCAT_TIP_KEYBOARD,
+                &CLSID_TEXT_SERVICE,
+            )?;
+
+            category_mgr.UnregisterCategory(
+                &CLSID_TEXT_SERVICE,
+                &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                &CLSID_TEXT_SERVICE,
+            )?;
+
+            category_mgr.UnregisterCategory(
+                &CLSID_TEXT_SERVICE,
+                &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
                 &CLSID_TEXT_SERVICE,
             )?;
         }

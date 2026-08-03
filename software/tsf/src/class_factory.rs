@@ -4,6 +4,14 @@ use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 
 use crate::text_service::TextService;
 
+use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
+use windows::core::PCWSTR;
+
+fn dbg(msg: &str) {
+    let wide: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe { OutputDebugStringW(PCWSTR(wide.as_ptr())) };
+}
+
 #[implement(IClassFactory)]
 pub struct ClassFactory;
 
@@ -14,6 +22,7 @@ impl IClassFactory_Impl for ClassFactory_Impl {
         riid: *const GUID,
         ppvobject: *mut *mut core::ffi::c_void,
     ) -> Result<()> {
+        dbg("ClassFactory::CreateInstance called");
         unsafe {
             if ppvobject.is_null() {
                 return Err(E_POINTER.into());
