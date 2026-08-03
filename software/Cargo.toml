@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "tsf",
-    "core/src-tauri",
+    "core/src-tauri", 
+    "ime_protocol",
 ]

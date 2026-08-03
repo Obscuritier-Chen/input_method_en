@@ -555,6 +555,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "ime_protocol",
  "ndarray 0.16.1",
  "ort",
  "serde",
@@ -1723,6 +1724,13 @@ checksum = "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "ime_protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -4182,6 +4190,8 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 name = "tsf_service"
 version = "0.1.0"
 dependencies = [
+ "ime_protocol",
+ "serde_json",
  "windows 0.58.0",
  "windows-core 0.58.0",
 ]
