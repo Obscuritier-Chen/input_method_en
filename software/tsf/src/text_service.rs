@@ -54,7 +54,7 @@ impl TextService {
 
 impl ITfTextInputProcessor_Impl for TextService_Impl {
     fn Activate(&self, ptim: Option<&ITfThreadMgr>, tid: u32) -> Result<()> {
-        dbg(&format!(">>> [STEP 1] Activate called! client_id (tid) = {}", tid));
+        dbg(&format!("[tsf] [STEP 1] Activate called! client_id (tid) = {}", tid));
         let thread_mgr = ptim.cloned().ok_or(windows::core::Error::from(
             windows::Win32::Foundation::E_INVALIDARG,
         ))?;
@@ -69,9 +69,9 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
 
             // 2. 仅进行一次Advise 注册，并捕获结果
             match keystroke_mgr.AdviseKeyEventSink(tid, &sink, TRUE) {
-                Ok(_) => dbg("[STEP 2] AdviseKeyEventSink Succeeded!"),
+                Ok(_) => dbg("[tsf] [STEP 2] AdviseKeyEventSink Succeeded!"),
                 Err(e) => {
-                    dbg(&format!("[STEP 2] AdviseKeyEventSink Failed! Error: {:?}", e));
+                    dbg(&format!("[tsf] [STEP 2] AdviseKeyEventSink Failed! Error: {:?}", e));
                     return Err(e);
                 }
             }
@@ -81,19 +81,19 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
         self.client_id.set(tid);
         *self.thread_mgr.borrow_mut() = Some(thread_mgr);
         
-        dbg(">>> Activate succeeded.");
+        dbg("[tsf] Activate succeeded.");
         Ok(())
     }
 
     fn Deactivate(&self) -> Result<()> {
-        dbg("<<< Deactivate called!");
+        dbg("[tsf] Deactivate called!");
 
         if let Some(thread_mgr) = self.thread_mgr.borrow_mut().take() {
             if let Ok(keystroke_mgr) = thread_mgr.cast::<ITfKeystrokeMgr>() {
                 unsafe {
                     match keystroke_mgr.UnadviseKeyEventSink(self.client_id.get()) {
-                        Ok(_) => dbg("UnadviseKeyEventSink Succeeded!"),
-                        Err(e) => dbg(&format!("UnadviseKeyEventSink Failed (Ignored): {:?}", e)),
+                        Ok(_) => dbg("[tsf] UnadviseKeyEventSink Succeeded!"),
+                        Err(e) => dbg(&format!("[tsf] UnadviseKeyEventSink Failed (Ignored): {:?}", e)),
                     }
                 }
             } else {
@@ -106,7 +106,7 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
         self.state.buffer.borrow_mut().clear();
         *self.state.composition.borrow_mut() = None;
 
-        dbg("<<< Deactivate complete.");
+        dbg("[tsf] Deactivate complete.");
         Ok(())
     }
 }
@@ -120,7 +120,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         let vk = wparam.0 as u32;
         let interesting = is_interesting_key(vk);
         dbg(&format!(
-            "--> [STEP 3] OnTestKeyDown: VK = 0x{:02X}, Intercepted = {}",
+            "[tsf] [STEP 3] OnTestKeyDown: VK = 0x{:02X}, Intercepted = {}",
             vk, interesting
         ));
         Ok(interesting.into())
@@ -135,7 +135,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         let Some(context) = pic else { return Ok(FALSE) };
         let vk = wparam.0 as u32;
 
-        dbg(&format!("--> [STEP 4] OnKeyDown triggered for VK = 0x{:02X}", vk));
+        dbg(&format!("[tsf] [STEP 4] OnKeyDown triggered for VK = 0x{:02X}", vk));
 
         let action = if vk == 0x08 {
             KeyAction::Backspace
@@ -156,7 +156,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
         // 卡点 5: RequestEditSession 的返回值
         unsafe {
-            dbg("--> Calling RequestEditSession...");
+            dbg("[tsf] Calling RequestEditSession...");
             let res = context.RequestEditSession(
                 self.client_id.get(),
                 &session,
@@ -164,8 +164,8 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             );
 
             match res {
-                Ok(_) => dbg("✅ [STEP 5] RequestEditSession returned Ok."),
-                Err(e) => dbg(&format!("❌ [STEP 5] RequestEditSession failed: {:?}", e)),
+                Ok(_) => dbg("[tsf] [STEP 5] RequestEditSession returned Ok."),
+                Err(e) => dbg(&format!("[tsf] [STEP 5] RequestEditSession failed: {:?}", e)),
             }
         }
 

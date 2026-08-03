@@ -4,10 +4,12 @@ use std::ptr;
 use windows::core::{implement, Result, Interface};
 use windows::Win32::UI::TextServices::{
     ITfEditSession, ITfEditSession_Impl, ITfContext, ITfContextComposition,
-    ITfComposition, ITfInsertAtSelection, ITfRange,
-    TF_IAS_QUERYONLY, TF_ANCHOR_END, TF_ST_CORRECTION, INSERT_TEXT_AT_SELECTION_FLAGS,
-    TF_ANCHOR_START,
+    ITfComposition, ITfInsertAtSelection, ITfRange, ITfContextView,
+    TF_IAS_QUERYONLY, TF_ST_CORRECTION, INSERT_TEXT_AT_SELECTION_FLAGS,
+    TF_ANCHOR_START, TF_ANCHOR_END
 };
+
+use windows::Win32::Foundation::{BOOL, RECT};
 
 use crate::text_service::SharedState;
 
@@ -30,6 +32,15 @@ pub struct KeyEditSession {
     pub state: std::rc::Rc<SharedState>,
     pub context: ITfContext,
     pub action: KeyAction,
+}
+
+/// 表示屏幕物理像素坐标的矩形区域
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CursorRect {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
 }
 
 impl ITfEditSession_Impl for KeyEditSession_Impl {
@@ -134,8 +145,11 @@ impl KeyEditSession_Impl {
         }
         self.state.buffer.borrow_mut().push(ch);
 
-        if let Ok(prefix) = self.get_prefix_context(ec) {
+        /*if let Ok(prefix) = self.get_prefix_context(ec) {
             dbg(&format!(">>> Context = {}", prefix));
+        }*/
+        if let Ok(Some(rect)) = self.get_cursor_rect(ec) {
+            dbg(&format!("[tsf] x={}, y={}, h={}", rect.left, rect.bottom, rect.bottom-rect.top));
         }
 
         Ok(())
@@ -207,5 +221,49 @@ impl KeyEditSession_Impl {
 
         // 5. 应用 3 大规则过滤并返回最终的 prefix
         Ok(parse_prefix(&raw_text))
+    }
+    pub fn get_cursor_rect(&self, ec: u32) -> Result<Option<CursorRect>> {
+        // 1. 从 context 获取当前的活动视图 ITfContextView
+        let view: ITfContextView = match unsafe { self.context.GetActiveView() } {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+
+        // 2. 获取当前的 Range（优先取 Composition，无 Composition 则取当前光标选区）
+        let range: ITfRange = if let Some(comp) = self.state.composition.borrow().as_ref() {
+            unsafe { comp.GetRange()? }
+        } else {
+            let insert_sel: ITfInsertAtSelection = self.context.cast()?;
+            unsafe { insert_sel.InsertTextAtSelection(ec, TF_IAS_QUERYONLY, &[])? }
+        };
+
+        // 3. 将 Range 坍缩到末尾（即光标插入点），获取光标处的精确定位
+        let cursor_range = unsafe { range.Clone()? };
+        unsafe {
+            cursor_range.Collapse(ec, TF_ANCHOR_END)?;
+        }
+
+        // 4. 调用 GetTextExt 获取该 Range 在屏幕上的包围矩形
+        let mut rect = RECT::default();
+        let mut clipped = BOOL::default();
+
+        unsafe {
+            // GetTextExt 可能因目标文本控件暂未渲染或不支持而返回 Err/0
+            if view.GetTextExt(ec, &cursor_range, &mut rect, &mut clipped).is_ok() {
+                // 部分异常情况（如非标准控件）可能返回全 0 坐标，需要过滤
+                if rect.left == 0 && rect.top == 0 && rect.right == 0 && rect.bottom == 0 {
+                    return Ok(None);
+                }
+
+                Ok(Some(CursorRect {
+                    left: rect.left,
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                }))
+            } else {
+                Ok(None)
+            }
+        }
     }
 }

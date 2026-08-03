@@ -13,3 +13,4 @@ software/target/*
 *.dll
 *.pdb
 model_export/output
+software/dev_utils.txt
