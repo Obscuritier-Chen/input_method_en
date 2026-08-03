@@ -23,7 +23,7 @@ fn dbg(msg: &str) {
 
 #[no_mangle]
 extern "system" fn DllMain(hinstance: HINSTANCE, _reason: u32, _reserved: *mut core::ffi::c_void) -> i32 {
-    dbg("DllMain called");
+    //dbg("DllMain called");
     DLL_INSTANCE.store(hinstance.0 as isize, Ordering::SeqCst);
     1 // TRUE
 }

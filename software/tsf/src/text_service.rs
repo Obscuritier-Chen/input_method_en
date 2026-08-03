@@ -61,30 +61,52 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
 
         // 把自己注册为 KeyEventSink,这样才能收到按键消息
         let keystroke_mgr: ITfKeystrokeMgr = thread_mgr.cast()?;
+
         unsafe {
             let sink: ITfKeyEventSink = self.cast()?;
+            // 1. 无脑尝试清理一次遗留的 tid 绑定（忽略错误）
+            let _ = keystroke_mgr.UnadviseKeyEventSink(tid);
+
+            // 2. 仅进行一次Advise 注册，并捕获结果
             match keystroke_mgr.AdviseKeyEventSink(tid, &sink, TRUE) {
-                Ok(_) => dbg("✅ [STEP 2] AdviseKeyEventSink Succeeded!"),
-                Err(e) => dbg(&format!("❌ [STEP 2] AdviseKeyEventSink Failed! Error: {:?}", e)),
+                Ok(_) => dbg("[STEP 2] AdviseKeyEventSink Succeeded!"),
+                Err(e) => {
+                    dbg(&format!("[STEP 2] AdviseKeyEventSink Failed! Error: {:?}", e));
+                    return Err(e);
+                }
             }
         }
-        unsafe {
-            let sink: ITfKeyEventSink = self.cast()?;
-            keystroke_mgr.AdviseKeyEventSink(tid, &sink, TRUE)?;
-        }
 
+        // 3. 保存内部状态
         self.client_id.set(tid);
         *self.thread_mgr.borrow_mut() = Some(thread_mgr);
+        
+        dbg(">>> Activate succeeded.");
         Ok(())
     }
 
     fn Deactivate(&self) -> Result<()> {
+        dbg("<<< Deactivate called!");
+
         if let Some(thread_mgr) = self.thread_mgr.borrow_mut().take() {
-            let keystroke_mgr: ITfKeystrokeMgr = thread_mgr.cast()?;
-            unsafe {
-                keystroke_mgr.UnadviseKeyEventSink(self.client_id.get())?;
+            if let Ok(keystroke_mgr) = thread_mgr.cast::<ITfKeystrokeMgr>() {
+                unsafe {
+                    match keystroke_mgr.UnadviseKeyEventSink(self.client_id.get()) {
+                        Ok(_) => dbg("UnadviseKeyEventSink Succeeded!"),
+                        Err(e) => dbg(&format!("UnadviseKeyEventSink Failed (Ignored): {:?}", e)),
+                    }
+                }
+            } else {
+                dbg("Cast to ITfKeystrokeMgr failed in Deactivate");
             }
         }
+
+        self.client_id.set(0);
+
+        self.state.buffer.borrow_mut().clear();
+        *self.state.composition.borrow_mut() = None;
+
+        dbg("<<< Deactivate complete.");
         Ok(())
     }
 }
