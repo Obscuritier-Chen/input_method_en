@@ -1,5 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::fmt;
 
 use windows::core::{implement, IUnknown, Result, Interface};
 use windows::Win32::UI::TextServices::{
@@ -23,6 +25,8 @@ fn dbg(msg: &str) {
 }
 
 use crate::edit_session::{KeyEditSession, KeyAction};
+use crate::window_bridge::WindowBridge;
+use crate::ipc_client::IpcClient;
 
 #[derive(Debug, Clone)]
 
@@ -33,10 +37,24 @@ pub struct TextService {
     state: Rc<SharedState>,
 }
 
-#[derive(Debug)]
 pub struct SharedState {
+    pub client_id: std::cell::Cell<u32>,
     pub composition: RefCell<Option<ITfComposition>>,
     pub buffer: RefCell<String>,
+    pub ipc_client: RefCell<Option<IpcClient>>,
+    pub bridge: RefCell<Option<Arc<WindowBridge>>>,
+}
+
+impl fmt::Debug for SharedState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SharedState")
+            .field("client_id", &self.client_id.get())
+            .field("buffer", &self.buffer.borrow())
+            .field("has_composition", &self.composition.borrow().is_some())
+            .field("has_ipc_client", &self.ipc_client.borrow().is_some())
+            .field("has_bridge", &self.bridge.borrow().is_some())
+            .finish()
+    }
 }
 
 impl TextService {
@@ -45,8 +63,11 @@ impl TextService {
             thread_mgr: RefCell::new(None),
             client_id: std::cell::Cell::new(0),
             state: Rc::new(SharedState {
+                client_id: std::cell::Cell::new(0),
                 composition: RefCell::new(None),
                 buffer: RefCell::new(String::new()),
+                ipc_client: RefCell::new(None),
+                bridge: RefCell::new(None),
             }),
         }
     }
@@ -79,6 +100,19 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
 
         // 3. 保存内部状态
         self.client_id.set(tid);
+        self.state.client_id.set(tid);
+
+        if let Ok(bridge) = WindowBridge::new(self.state.clone()) {
+            let bridge_arc = Arc::new(bridge);
+            
+            // 2. 启动后台 IPC 管道客户端
+            let ipc = IpcClient::start(bridge_arc.clone());
+
+            // 3. 保存到 SharedState 中
+            *self.state.bridge.borrow_mut() = Some(bridge_arc);
+            *self.state.ipc_client.borrow_mut() = Some(ipc);
+        }
+
         *self.thread_mgr.borrow_mut() = Some(thread_mgr);
         
         dbg("[tsf] Activate succeeded.");

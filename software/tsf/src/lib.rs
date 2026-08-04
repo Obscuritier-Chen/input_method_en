@@ -4,6 +4,9 @@ mod text_service;
 mod class_factory;
 mod registration;
 mod edit_session;
+mod window_bridge;
+mod commit_session;
+mod ipc_client;
 
 use windows::core::{HRESULT, GUID};
 use windows::Win32::Foundation::{HMODULE, S_OK, CLASS_E_CLASSNOTAVAILABLE, S_FALSE};

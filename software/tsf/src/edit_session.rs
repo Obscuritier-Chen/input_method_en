@@ -122,7 +122,7 @@ impl KeyEditSession_Impl {
     }
 
     fn insert_char(&self, ec: u32, ch: char) -> Result<()> {
-        /*let composition = self.ensure_composition(ec)?;
+        let composition = self.ensure_composition(ec)?;
         let range = unsafe { composition.GetRange()? };
 
         // 把光标移到 range 末尾再插入新字符
@@ -134,23 +134,40 @@ impl KeyEditSession_Impl {
 
         self.state.buffer.borrow_mut().push(ch);
 
-        !!!// TODO: 这里之后接命名管道,把 buffer 内容发给 Tauri 主进程请求候选词 !!!
-        println!("当前输入: {}", self.state.buffer.borrow());*/
+        let prefix = self.get_prefix_context(ec).unwrap_or_default();
+        let buffer = self.state.buffer.borrow().clone();
+        let cursor_rect = self.get_cursor_rect(ec).ok().flatten().map(|r| ime_protocol::CursorRect {
+             left: r.left, top: r.top, right: r.right, bottom: r.bottom, 
+        });
+
+        // 3. 打包 ClientRequest 发送到 IPC 客户端
+        let req = ime_protocol::ClientRequest::UpdateContext {
+            session_id: self.state.client_id.get(), // 使用 tid 作为 session_id
+            prefix,
+            buffer,
+            cursor_rect,
+        };
+
+        if let Some(ipc) = &self.state.ipc_client.borrow().as_ref() {
+            ipc.send(req);
+        }
+
+        //println!("当前输入: {}", self.state.buffer.borrow());
 
         // 临时改造：不启动 Composition，直接将字符插入到宿主应用的当前光标处
-        let text: Vec<u16> = ch.encode_utf16(&mut [0u16; 2]).to_vec();
+        /*let text: Vec<u16> = ch.encode_utf16(&mut [0u16; 2]).to_vec();
         let insert_sel: ITfInsertAtSelection = self.context.cast()?;
         unsafe {
             insert_sel.InsertTextAtSelection(ec, INSERT_TEXT_AT_SELECTION_FLAGS(0), &text)?;
         }
-        self.state.buffer.borrow_mut().push(ch);
+        self.state.buffer.borrow_mut().push(ch);*/
 
         /*if let Ok(prefix) = self.get_prefix_context(ec) {
             dbg(&format!(">>> Context = {}", prefix));
         }*/
-        if let Ok(Some(rect)) = self.get_cursor_rect(ec) {
+        /*if let Ok(Some(rect)) = self.get_cursor_rect(ec) {
             dbg(&format!("[tsf] x={}, y={}, h={}", rect.left, rect.bottom, rect.bottom-rect.top));
-        }
+        }*/
 
         Ok(())
     }
