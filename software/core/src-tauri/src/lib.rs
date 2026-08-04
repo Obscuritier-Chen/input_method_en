@@ -1,15 +1,22 @@
 mod vocabulary;
 mod candidate_index;
 mod inference;
+mod ipc_server;
+mod sdll;
 
 pub use vocabulary::WordVocabulary;
 pub use candidate_index::CandidateIndex;
 pub use inference::{Predictor, Candidate};
+pub use ipc_server::PipeServerState;
 
 use std::path::Path;
 use std::sync::Mutex;
 
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter, State};
+
+use ime_protocol::ServerCommand;
+
+use crate::ipc_server::start_ipc_server;
 
 struct AppState {
     vocab: WordVocabulary,
@@ -91,10 +98,29 @@ fn hide_candidates_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn on_candidate_selected(word: String) -> Result<(), String> {
+async fn on_candidate_selected(
+    session_id: u32,
+    word: String,
+    state: State<'_, PipeServerState>,
+    app_handle: tauri::AppHandle
+) -> Result<(), String> {
+    let sessions = state.sessions.lock().await;
 
-    // 暂时只打印，真正“提交进目标应用”的逻辑要等 TSF 接入后再实现
-    println!("用户选中了候选词: {word}");
+    if let Some(tx) = sessions.get(&session_id) {
+        let cmd = ServerCommand::CommitText {
+            session_id,
+            text: word,
+        };
+        tx.send(cmd).map_err(|e| e.to_string())?;
+        
+    } else {
+        eprintln!("找不到 session_id = {} 对应的管道连接", session_id);
+    }
+
+    //选完词后自动隐藏候选窗口
+    if let Some(window) = app_handle.get_webview_window("candidates") {
+        let _ = window.hide();
+    }
 
     Ok(())
 }
@@ -112,13 +138,18 @@ pub fn run() {
     let candidates = CandidateIndex::load_binary(&candidate_path).expect("加载 prefix_candidates.bin 失败");
     let predictor = Predictor::load(&onnx_path).expect("加载 ONNX 模型失败");
 
+    // 1. 初始化 IPC 管道状态
+    let pipe_state = PipeServerState::default();
+
     tauri::Builder::default()
         .manage(AppState {
             vocab,
             candidates,
             predictor: Mutex::new(predictor),
         })
-        .setup(|app| {
+        .manage(pipe_state.clone())
+        .setup(move |app| {
+            start_ipc_server(app.handle().clone(), pipe_state);
 
             WebviewWindowBuilder::new(app, "candidates", WebviewUrl::App("candidate.html".into()))
                 .decorations(false)

@@ -28,3 +28,13 @@ bincode = "1"
 ort = "2.0.0-rc.12"
 ndarray = "0.16"
 ime_protocol = { path = "../../ime_protocol" }
+tokio = { version = "1", features = ["full"] }
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Pipes",
+]
