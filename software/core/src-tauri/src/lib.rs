@@ -4,11 +4,16 @@ mod inference;
 mod ipc_server;
 mod sdll;
 mod session;
+mod completion_service;
 
 pub use vocabulary::WordVocabulary;
 pub use candidate_index::CandidateIndex;
 pub use inference::{Predictor, Candidate};
 pub use session::SessionManager;
+pub use completion_service::{
+    generate_candidates,
+    CandidateDto,
+};
 
 use std::path::Path;
 use std::sync::{Mutex, Arc};
@@ -19,16 +24,10 @@ use ime_protocol::ServerCommand;
 
 use crate::ipc_server::start_ipc_server;
 
-struct AppState {
+pub struct AppState {
     vocab: WordVocabulary,
     candidates: CandidateIndex,
     predictor: Mutex<Predictor>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-struct CandidateDto {
-    word: String,
-    score: f32,
 }
 
 #[tauri::command]
@@ -36,45 +35,13 @@ async fn get_candidates(
     context: Vec<String>,
     prefix: String,
     state: tauri::State<'_ , AppState>,
-    session_id: u32,
-    pipe_state: State<'_, SessionManager>, 
-    app_handle: tauri::AppHandle,
 ) -> Result<Vec<CandidateDto>, String> {
 
-    println!("[Debug get_candidates] Received request -> prefix: '{prefix}', context: {context:?}");
-
-    // 2. 跳过选词过程：默认直接选择 "test" 并自动提交上屏
-    println!("[Debug Auto-Select] Skipping candidate selection, auto-committing 'test'...");
-    
-    // 自动调用已有的选词提交逻辑
-    let _ = on_candidate_selected(session_id, "test".to_string(), pipe_state, app_handle).await;
-
-    // 3. 返回空列表（或模拟候选词），此时 UI 窗口已经被自动隐藏
-    Ok(vec![])
-
-    /*let context_refs: Vec<&str> = context.iter().map(|s| s.as_str()).collect();
-    let context_ids = state.vocab.encode(&context_refs);
-
-    let candidate_ids = state
-        .candidates
-        .get_candidates(&prefix)
-        .cloned()
-        .unwrap_or_default();
-
-    if candidate_ids.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let mut predictor = state.predictor.lock().map_err(|e| e.to_string())?;
-
-    let results = predictor
-        .predict(&context_ids, &candidate_ids, &state.vocab, 10)
-        .map_err(|e| e.to_string())?;
-
-    Ok(results
-        .into_iter()
-        .map(|c| CandidateDto { word: c.word, score: c.score })
-        .collect())*/
+    generate_candidates(
+        context,
+        prefix,
+        &state,
+    )
 }
 
 #[tauri::command]
