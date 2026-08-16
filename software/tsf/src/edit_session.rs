@@ -71,9 +71,11 @@ impl ITfEditSession_Impl for KeyEditSession_Impl {
                     left: r.left, top: r.top, right: r.right, bottom: r.bottom, 
                 });
 
+                let prefix= self.get_prefix_context(ec)?;
+
                 let req = ClientRequest::UpdateContext {
                     session_id,
-                    prefix: buffer.clone(),
+                    prefix,
                     buffer: buffer.clone(),
                     cursor_rect,
                 };
