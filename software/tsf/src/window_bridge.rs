@@ -11,6 +11,13 @@ use windows::Win32::UI::TextServices::{ITfContext, TF_ES_READWRITE, TF_ES_SYNC};
 use crate::commit_session::CommitEditSession;
 use crate::text_service::SharedState;
 
+use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
+
+fn dbg(msg: &str) {
+    let wide: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe { OutputDebugStringW(PCWSTR(wide.as_ptr())) };
+}
+
 pub const WM_IME_COMMIT: u32 = WM_USER + 101;
 
 pub struct WindowBridge {
@@ -99,6 +106,8 @@ unsafe extern "system" fn wnd_proc(
                 // 从 WindowLongPtr 获取绑定的 BridgeState（此处简化为提取全局或传入的 session）
                 // 真正执行 RequestEditSession (合法地在主 STA 线程运行)
                 trigger_commit(hwnd, text);
+
+                dbg(&format!("WindowBridge WndProc received WM_CREATE, hwnd:{:?}", hwnd));
             }
             LRESULT(0)
         }

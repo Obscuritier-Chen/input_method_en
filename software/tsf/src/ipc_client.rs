@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use ime_protocol::{ClientRequest, ServerCommand};
+use serde_json::json;
 use crate::window_bridge::WindowBridge;
 
 const PIPE_NAME: &str = r"\\.\pipe\my_ime_named_pipe";
@@ -44,7 +45,7 @@ impl IpcClient {
                     Err(err) => {
                         // 失败时记录日志并等待，防止卡死 UI
                         dbg(&format!(
-                            "[tsf-ipc] Failed to connect to Tauri pipe: {:?} retrying in 1s...",
+                            "[tsf] Failed to connect to Tauri pipe: {:?} retrying in 1s...",
                             err
                         ));
                         thread::sleep(Duration::from_secs(10));
@@ -56,7 +57,7 @@ impl IpcClient {
             let mut reader = BufReader::new(match file.try_clone() {
                 Ok(f) => f,
                 Err(e) => {
-                    dbg(&format!("[tsf-ipc] Failed to clone pipe handle: {:?}", e));
+                    dbg(&format!("[tsf] Failed to clone pipe handle: {:?}", e));
                     return;
                 }
             });
@@ -66,12 +67,20 @@ impl IpcClient {
             thread::spawn(move || {
                 dbg("[tsf] Writer thread started");
                 while let Ok(req) = rx.recv() {
-                    if let Ok(json) = serde_json::to_string(&req) {
-                        let mut data = json.into_bytes();
-                        data.push(b'\n');
-                        if let Err(e) = writer.write_all(&data) {
-                            dbg(&format!("[tsf] Failed to send message to Tauri: {:?}", e));
-                            break;
+                    match serde_json::to_string(&req) {
+                        Ok(json)=>{
+                            dbg(&format!("[tsf] sending JSON to pipe: {}",json));
+
+                            let mut data = json.into_bytes();
+                            data.push(b'\n');
+
+                            if let Err(e) = writer.write_all(&data) {
+                                dbg(&format!("[tsf] Failed to send message to Tauri: {:?}", e));
+                                break;
+                            }
+                        }
+                        Err(e)=>{
+                            dbg(&format!("[tsf] serde err: {:?}",e));
                         }
                     }
                 }

@@ -9,6 +9,7 @@ use windows::Win32::UI::TextServices::{
     ITfThreadMgr, ITfKeyEventSink, ITfKeyEventSink_Impl,
     ITfKeystrokeMgr,ITfComposition, ITfContext,
     ITfEditSession, ITfEditSession_Impl,
+    ITfCompositionSink, ITfCompositionSink_Impl,
 };
 use windows::Win32::UI::TextServices::{
     TF_ES_SYNC,
@@ -30,7 +31,7 @@ use crate::ipc_client::IpcClient;
 
 #[derive(Debug, Clone)]
 
-#[implement(ITfTextInputProcessor, ITfKeyEventSink)]
+#[implement(ITfTextInputProcessor, ITfKeyEventSink, ITfCompositionSink)]
 pub struct TextService {
     thread_mgr: RefCell<Option<ITfThreadMgr>>,
     client_id: std::cell::Cell<u32>,
@@ -43,6 +44,7 @@ pub struct SharedState {
     pub buffer: RefCell<String>,
     pub ipc_client: RefCell<Option<IpcClient>>,
     pub bridge: RefCell<Option<Arc<WindowBridge>>>,
+    pub composition_sink: RefCell<Option<ITfCompositionSink>>,
 }
 
 impl fmt::Debug for SharedState {
@@ -68,6 +70,7 @@ impl TextService {
                 buffer: RefCell::new(String::new()),
                 ipc_client: RefCell::new(None),
                 bridge: RefCell::new(None),
+                composition_sink: RefCell::new(None),
             }),
         }
     }
@@ -102,15 +105,34 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
         self.client_id.set(tid);
         self.state.client_id.set(tid);
 
-        if let Ok(bridge) = WindowBridge::new(self.state.clone()) {
-            let bridge_arc = Arc::new(bridge);
-            
-            // 2. 启动后台 IPC 管道客户端
-            let ipc = IpcClient::start(bridge_arc.clone());
+        let comp_sink_res = unsafe { self.cast::<ITfCompositionSink>() };
+        if let Ok(comp_sink) = comp_sink_res {
+            *self.state.composition_sink.borrow_mut() = Some(comp_sink);
+            //dbg("[tsf] composition_sink saved to SharedState");
+        } else {
+            dbg("[tsf]  Failed to cast self to ITfCompositionSink");
+        }
 
-            // 3. 保存到 SharedState 中
-            *self.state.bridge.borrow_mut() = Some(bridge_arc);
-            *self.state.ipc_client.borrow_mut() = Some(ipc);
+        match WindowBridge::new(self.state.clone()) {
+            Ok(bridge) => {
+                //dbg("[tsf] window_bridge successfully created");
+                let bridge_arc = Arc::new(bridge);
+
+                // 2. 启动后台 IPC 管道客户端
+                // 注意：如果 IpcClient::start 返回 Result，务必显式捕获 Err
+                let ipc = IpcClient::start(bridge_arc.clone());
+                //dbg("[tsf] ipc client started");
+
+                // 3. 保存到 SharedState 中
+                *self.state.bridge.borrow_mut() = Some(bridge_arc);
+                *self.state.ipc_client.borrow_mut() = Some(ipc);
+                
+                //dbg("[tsf] bridge & ipc_client saved to SharedState");
+            }
+            Err(e) => {
+                let err_msg = format!("[tsf] WindowBridge::new failed: {:?}", e);
+                dbg(&err_msg);
+            }
         }
 
         *self.thread_mgr.borrow_mut() = Some(thread_mgr);
@@ -120,7 +142,7 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
     }
 
     fn Deactivate(&self) -> Result<()> {
-        dbg("[tsf] Deactivate called!");
+        //dbg("[tsf] Deactivate called!");
 
         if let Some(thread_mgr) = self.thread_mgr.borrow_mut().take() {
             if let Ok(keystroke_mgr) = thread_mgr.cast::<ITfKeystrokeMgr>() {
@@ -139,8 +161,23 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
 
         self.state.buffer.borrow_mut().clear();
         *self.state.composition.borrow_mut() = None;
+        *self.state.composition_sink.borrow_mut() = None;
 
         dbg("[tsf] Deactivate complete.");
+        Ok(())
+    }
+}
+
+impl ITfCompositionSink_Impl for TextService_Impl {
+    fn OnCompositionTerminated(
+        &self,
+        _ec: u32,
+        _pcomposition: Option<&ITfComposition>,
+    ) -> Result<()> {
+        dbg("[tsf] OnCompositionTerminated triggered");
+        // 当组合在外部被终止（例如用户用鼠标点击了别处）时，清空内存组合状态
+        *self.state.composition.borrow_mut() = None;
+        self.state.buffer.borrow_mut().clear();
         Ok(())
     }
 }

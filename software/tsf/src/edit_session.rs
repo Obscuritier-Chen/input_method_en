@@ -1,15 +1,15 @@
 use std::ptr;
+use std::mem::ManuallyDrop;
 
 // crates/tsf-service/src/edit_session.rs
 use windows::core::{implement, Result, Interface};
 use windows::Win32::UI::TextServices::{
-    ITfEditSession, ITfEditSession_Impl, ITfContext, ITfContextComposition,
-    ITfComposition, ITfInsertAtSelection, ITfRange, ITfContextView,
-    TF_IAS_QUERYONLY, TF_ST_CORRECTION, INSERT_TEXT_AT_SELECTION_FLAGS,
-    TF_ANCHOR_START, TF_ANCHOR_END
+    INSERT_TEXT_AT_SELECTION_FLAGS, ITfComposition, ITfCompositionSink, ITfContext, ITfContextComposition, ITfContextView, ITfEditSession, ITfEditSession_Impl, ITfInsertAtSelection, ITfRange, TF_AE_NONE, TF_ANCHOR_END, TF_ANCHOR_START, TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE, TF_ST_CORRECTION,
 };
 
 use windows::Win32::Foundation::{BOOL, RECT};
+
+use ime_protocol::ClientRequest;
 
 use crate::text_service::SharedState;
 
@@ -45,11 +45,47 @@ pub struct CursorRect {
 
 impl ITfEditSession_Impl for KeyEditSession_Impl {
     fn DoEditSession(&self, ec: u32) -> Result<()> {
-        match &self.action {
+        //dbg("[tsf] doeditsession called");
+
+        // 1. 显式捕获 match 结果，避免 ? 隐式提前返回
+        let res = match &self.action {
             KeyAction::Letter(ch) => self.insert_char(ec, *ch),
             KeyAction::Backspace => self.remove_last_char(ec),
             KeyAction::Commit => self.commit(ec),
+        };
+
+        if let Err(e) = res {
+            dbg(&format!("[tsf] Action executed failed with error: {:?}", e));
+            return Err(e);
         }
+
+        // 2. 获取缓冲区文本并强行打印状态
+        let buffer = self.state.buffer.borrow().clone();
+        let session_id = self.state.client_id.get();
+        //dbg(&format!("[tsf] Current buffer: '{}', len: {}", buffer, buffer.len()));
+
+        // 3. 执行 IPC 发送
+        if !buffer.is_empty() {
+            if let Some(ipc) = self.state.ipc_client.borrow().as_ref() {
+                let cursor_rect = self.get_cursor_rect(ec).ok().flatten().map(|r| ime_protocol::CursorRect {
+                    left: r.left, top: r.top, right: r.right, bottom: r.bottom, 
+                });
+
+                let req = ClientRequest::UpdateContext {
+                    session_id,
+                    prefix: buffer.clone(),
+                    buffer: buffer.clone(),
+                    cursor_rect,
+                };
+
+                dbg(&format!("[tsf] sending UpdateContext: {} to tauri", buffer));
+                ipc.send(req);
+            } else {
+                dbg("[tsf] ipc_client unconnected (is None)!");
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -115,59 +151,45 @@ impl KeyEditSession_Impl {
         };
 
         let context_comp: ITfContextComposition = self.context.cast()?;
-        let composition = unsafe { context_comp.StartComposition(ec, &range, None)? };
+        let sink_borrow = self.state.composition_sink.borrow();
+        let Some(sink) = sink_borrow.as_ref() else {
+            //dbg("[tsf] composition_sink is None!");
+            return Err(windows::core::Error::from_hresult(windows::core::HRESULT(-2147024809)));
+        };
+
+        let composition = unsafe { context_comp.StartComposition(ec, &range, sink)? };
 
         *self.state.composition.borrow_mut() = Some(composition.clone());
         Ok(composition)
     }
 
     fn insert_char(&self, ec: u32, ch: char) -> Result<()> {
+        // 1. 更新内存状态 buffer
+        self.state.buffer.borrow_mut().push(ch);
+        let buffer = self.state.buffer.borrow().clone();
+        //dbg(&format!("[tsf] insert_char: buffer is now '{}'", buffer));
+
+        // 2. 获取/创建 Composition 并全量更新 TSF 预输入文本
         let composition = self.ensure_composition(ec)?;
+        //dbg("[tsf] Calling composition.GetRange...");
         let range = unsafe { composition.GetRange()? };
 
-        // 把光标移到 range 末尾再插入新字符
+        let utf16: Vec<u16> = buffer.encode_utf16().collect();
+
         unsafe {
+            //dbg(&format!("[tsf] Calling range.SetText with utf16 len {}...", utf16.len()));
+
+            range.SetText(ec, 0, &utf16)?;
             range.Collapse(ec, TF_ANCHOR_END)?;
-            let text: Vec<u16> = ch.encode_utf16(&mut [0u16; 2]).to_vec();
-            range.SetText(ec, TF_ST_CORRECTION, &text)?;
+            
+
+            //dbg("[tsf] Calling context.SetSelection...");
+            let selection = TF_SELECTION {
+                range: ManuallyDrop::new(Some(range.clone())),
+                style: TF_SELECTIONSTYLE { ase: TF_AE_NONE, fInterimChar: false.into() },
+            };
+            self.context.SetSelection(ec, &[selection])?;
         }
-
-        self.state.buffer.borrow_mut().push(ch);
-
-        let prefix = self.get_prefix_context(ec).unwrap_or_default();
-        let buffer = self.state.buffer.borrow().clone();
-        let cursor_rect = self.get_cursor_rect(ec).ok().flatten().map(|r| ime_protocol::CursorRect {
-             left: r.left, top: r.top, right: r.right, bottom: r.bottom, 
-        });
-
-        // 3. 打包 ClientRequest 发送到 IPC 客户端
-        let req = ime_protocol::ClientRequest::UpdateContext {
-            session_id: self.state.client_id.get(), // 使用 tid 作为 session_id
-            prefix,
-            buffer,
-            cursor_rect,
-        };
-
-        if let Some(ipc) = &self.state.ipc_client.borrow().as_ref() {
-            ipc.send(req);
-        }
-
-        //println!("当前输入: {}", self.state.buffer.borrow());
-
-        // 临时改造：不启动 Composition，直接将字符插入到宿主应用的当前光标处
-        /*let text: Vec<u16> = ch.encode_utf16(&mut [0u16; 2]).to_vec();
-        let insert_sel: ITfInsertAtSelection = self.context.cast()?;
-        unsafe {
-            insert_sel.InsertTextAtSelection(ec, INSERT_TEXT_AT_SELECTION_FLAGS(0), &text)?;
-        }
-        self.state.buffer.borrow_mut().push(ch);*/
-
-        /*if let Ok(prefix) = self.get_prefix_context(ec) {
-            dbg(&format!(">>> Context = {}", prefix));
-        }*/
-        /*if let Ok(Some(rect)) = self.get_cursor_rect(ec) {
-            dbg(&format!("[tsf] x={}, y={}, h={}", rect.left, rect.bottom, rect.bottom-rect.top));
-        }*/
 
         Ok(())
     }
