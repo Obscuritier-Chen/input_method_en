@@ -1,122 +1,164 @@
-// crates/tsf-service/src/ipc_client.rs
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
-use std::os::windows::fs::OpenOptionsExt;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use ime_protocol::{ClientRequest, ServerCommand};
-use serde_json::json;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::windows::named_pipe::ClientOptions;
+use tokio::runtime::Builder;
+use tokio::sync::mpsc;
+
 use crate::window_bridge::WindowBridge;
+
+use windows::core::PCWSTR;
+use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 
 const PIPE_NAME: &str = r"\\.\pipe\my_ime_named_pipe";
 
-use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
-use windows::core::PCWSTR;
-
 fn dbg(msg: &str) {
-    let wide: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe { OutputDebugStringW(PCWSTR(wide.as_ptr())) };
+    let wide: Vec<u16> = msg
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+
+    unsafe {
+        OutputDebugStringW(PCWSTR(wide.as_ptr()));
+    }
 }
 
 pub struct IpcClient {
-    tx: Sender<ClientRequest>,
+    tx: mpsc::UnboundedSender<ClientRequest>,
 }
 
 impl IpcClient {
-    pub fn start(bridge: std::sync::Arc<WindowBridge>) -> Self {
-        let (tx, rx) = channel::<ClientRequest>();
+    pub fn start(bridge: Arc<WindowBridge>) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel::<ClientRequest>();
 
         thread::spawn(move || {
-            dbg("[tsf] IPC background listener thread started");
+            dbg("[tsf] IPC Tokio runtime thread started");
 
-            // 建立连接重试循环 (Connect Retry Loop)
-            let file = loop {
-                match OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(PIPE_NAME)
-                {
-                    Ok(f) => {
-                        dbg("[tsf] Successfully connected to Tauri server pipe!");
-                        break f;
-                    }
-                    Err(err) => {
-                        // 失败时记录日志并等待，防止卡死 UI
-                        dbg(&format!(
-                            "[tsf] Failed to connect to Tauri pipe: {:?} retrying in 1s...",
-                            err
-                        ));
-                        thread::sleep(Duration::from_secs(10));
-                    }
-                }
-            };
+            let runtime = Builder::new_current_thread()
+                .enable_all()
+                .build();
 
-            // 2. 管道连通后，克隆句柄分别用于读写
-            let mut reader = BufReader::new(match file.try_clone() {
-                Ok(f) => f,
-                Err(e) => {
-                    dbg(&format!("[tsf] Failed to clone pipe handle: {:?}", e));
-                    return;
-                }
-            });
-            let mut writer = file;
-
-            // 3. 独立线程负责向 Tauri 发送消息
-            thread::spawn(move || {
-                dbg("[tsf] Writer thread started");
-                while let Ok(req) = rx.recv() {
-                    match serde_json::to_string(&req) {
-                        Ok(json)=>{
-                            dbg(&format!("[tsf] sending JSON to pipe: {}",json));
-
-                            let mut data = json.into_bytes();
-                            data.push(b'\n');
-
-                            if let Err(e) = writer.write_all(&data) {
-                                dbg(&format!("[tsf] Failed to send message to Tauri: {:?}", e));
-                                break;
-                            }
-                        }
-                        Err(e)=>{
-                            dbg(&format!("[tsf] serde err: {:?}",e));
-                        }
-                    }
-                }
-                dbg("[tsf] Writer thread exited");
-            });
-
-            // 4. 当前线程循环读取 Tauri 下发的指令
-            dbg("[tsf] Listening for incoming commands from Tauri...");
-            let mut line = String::new();
-            while reader.read_line(&mut line).is_ok() {
-                if line.is_empty() {
-                    dbg("[tsf] Received EOF, Tauri disconnected the pipe");
-                    break;
-                }
-                
-                dbg(&format!("[tsf] received server command: {}", line.trim()));
-
-                if let Ok(cmd) = serde_json::from_str::<ServerCommand>(&line) {
-                    match cmd {
-                        ServerCommand::CommitText { session_id: _, text } => {
-                            dbg(&format!("[tsf] Triggering CommitText: {}", text));
-                            bridge.post_commit(text);
-                        }
-                        _ => {}
-                    }
-                }
-                line.clear();
+            match runtime {
+                Ok(rt) => rt.block_on(run_ipc_client(bridge, rx)),
+                Err(e) => dbg(&format!("[tsf] Failed to create Tokio runtime: {:?}", e)),
             }
-            dbg("[tsf] Reader thread exited");
+
+            dbg("[tsf] IPC Tokio runtime thread exited");
         });
 
         Self { tx }
     }
 
-    /// 发送输入状态更新请求给 Tauri
+    /// 发送输入状态更新请求给 Tauri（同步 API）
     pub fn send(&self, req: ClientRequest) {
-        let _ = self.tx.send(req);
+        if let Err(e) = self.tx.send(req) {
+            dbg(&format!("[tsf] ClientRequest send failed: {:?}", e));
+        } else {
+            dbg("[tsf] ClientRequest queued successfully");
+        }
+    }
+}
+
+async fn run_ipc_client(
+    bridge: Arc<WindowBridge>,
+    mut rx: mpsc::UnboundedReceiver<ClientRequest>,
+) {
+    loop {
+        // 1. 尝试连接管道（卫语句循环，完全依赖类型推导）
+        let client = loop {
+            dbg("[tsf] Trying to connect to Tauri pipe...");
+            match ClientOptions::new().open(PIPE_NAME) {
+                Ok(c) => {
+                    dbg("[tsf] Successfully connected to Tauri server pipe!");
+                    break c;
+                }
+                Err(err) => {
+                    dbg(&format!("[tsf] Failed to connect to Tauri pipe: {:?}, retrying in 1s...", err));
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+            }
+        };
+
+        dbg("[tsf] NamedPipeClient established");
+
+        // 2. 拆分读写半区
+        let (read_half, mut write_half) = tokio::io::split(client);
+        let mut reader = BufReader::new(read_half);
+        let mut line = String::new();
+
+        dbg("[tsf] IPC duplex read/write started");
+
+        // 3. 事件双工处理主循环
+        loop {
+            line.clear();
+
+            tokio::select! {
+                // A. 处理来自 Tauri 的消息
+                read_res = reader.read_line(&mut line) => {
+                    let bytes_read = match read_res {
+                        Ok(0) => {
+                            dbg("[tsf] Tauri closed pipe connection");
+                            break;
+                        }
+                        Ok(n) => n,
+                        Err(e) => {
+                            dbg(&format!("[tsf] Pipe read failed: {:?}", e));
+                            break;
+                        }
+                    };
+
+                    let raw_line = line.trim_end();
+                    dbg(&format!("[tsf] Received {} bytes from Tauri: {}", bytes_read, raw_line));
+
+                    if let Ok(cmd) = serde_json::from_str::<ServerCommand>(raw_line) {
+                        match cmd {
+                            ServerCommand::CommitText { session_id: _, text } => {
+                                dbg(&format!("[tsf] Triggering CommitText: {}", text));
+                                bridge.post_commit(text);
+                            }
+                            _ => dbg("[tsf] Received unsupported ServerCommand"),
+                        }
+                    } else {
+                        dbg("[tsf] Failed to parse ServerCommand");
+                    }
+                }
+
+                // B. 处理发往 Tauri 的消息
+                req = rx.recv() => {
+                    let req = match req {
+                        Some(r) => r,
+                        None => {
+                            dbg("[tsf] ClientRequest channel closed");
+                            return; // MPSC 关闭，彻底退出线程
+                        }
+                    };
+
+                    let json = match serde_json::to_string(&req) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            dbg(&format!("[tsf] serde error: {:?}", e));
+                            continue;
+                        }
+                    };
+
+                    dbg(&format!("[tsf] sending JSON to pipe: {}", json));
+
+                    let mut data = json.into_bytes();
+                    data.push(b'\n');
+
+                    if let Err(e) = write_half.write_all(&data).await {
+                        dbg(&format!("[tsf] Pipe write failed: {:?}", e));
+                    } else {
+                        dbg("[tsf] async write_all completed");
+                    }
+                }
+            }
+        }
+
+        dbg("[tsf] IPC connection lost, reconnecting...");
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
