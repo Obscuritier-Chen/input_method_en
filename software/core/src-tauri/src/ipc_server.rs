@@ -207,23 +207,6 @@ async fn handle_client(
                             prefix,
                             buffer
                         );
-                        let context: Vec<String> = prefix
-                            .lines()
-                            .map(|line| line.to_string())
-                            .collect();
-
-                        let display_str = generate_candidates(context, buffer.to_string(), &_app_state)
-                            .map(|candidates| {
-                                candidates
-                                    .iter()
-                                    // 🎯 使用 word 和 score 字段，格式化为 "词(分数)" 或 "词 - 分数"
-                                    .map(|c| format!("word: {} - score: {}", c.word, c.score))
-                                    .collect::<Vec<_>>()
-                                    .join(" | ")
-                            })
-                            .unwrap_or_else(|err| format!("[错误: {}]", err));
-
-                        println!("{}", display_str);
 
                         // ---------------------------------------------
                         // 注册 session

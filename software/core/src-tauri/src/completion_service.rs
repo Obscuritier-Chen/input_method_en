@@ -1,3 +1,5 @@
+use tauri::webview::cookie::prefix;
+
 use crate::AppState;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -6,11 +8,26 @@ pub struct CandidateDto {
     pub score: f32,
 }
 
+pub fn build_context(
+    buffer: &str,
+) -> Vec<String> {
+    buffer
+        .split_whitespace()
+        .map(str::to_string)
+        .collect()
+}
+
+#[tauri::command]
 pub fn generate_candidates(
-    context: Vec<String>,
+    buffer: String,
     prefix: String,
     state: &AppState,
 ) -> Result<Vec<CandidateDto>, String> {
+    //吗唔的gpt/gemini 和claude接口不一致
+    let context= build_context(&prefix);
+    let prefix = buffer;
+
+
     println!(
         "[GenerateCandidates] prefix='{}', context={:?}",
         prefix,

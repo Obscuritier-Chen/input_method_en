@@ -11,6 +11,7 @@ pub use candidate_index::CandidateIndex;
 pub use inference::{Predictor, Candidate};
 pub use session::SessionManager;
 pub use completion_service::{
+    build_context,
     generate_candidates,
     CandidateDto,
 };
@@ -32,15 +33,15 @@ pub struct AppState {
 
 #[tauri::command]
 async fn get_candidates(
-    context: Vec<String>,
+    buffer: String,
     prefix: String,
-    state: tauri::State<'_ , AppState>,
+    state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<CandidateDto>, String> {
 
     generate_candidates(
-        context,
+        buffer,
         prefix,
-        &state,
+        state.as_ref(),
     )
 }
 
@@ -49,7 +50,6 @@ fn show_candidates_window(
     app: tauri::AppHandle,
     x: f64,
     y: f64,
-    candidates: Vec<CandidateDto>,
 ) -> Result<(), String> {
 
     let window = app
@@ -60,11 +60,9 @@ fn show_candidates_window(
         .set_position(tauri::PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())?;
 
-    window
-        .emit("candidates-updated", &candidates)
-        .map_err(|e| e.to_string())?;
-
     window.show().map_err(|e| e.to_string())?;
+
+    window.set_focus().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -125,54 +123,34 @@ pub fn run() {
     // 1. 初始化 IPC 管道状态
     let pipe_state = SessionManager::default();
 
-    /*tauri::Builder::default()
-        .manage(AppState {
-            vocab,
-            candidates,
-            predictor: Mutex::new(predictor),
-        })
-        .manage(pipe_state.clone())
-        .setup(move |app| {
-            start_ipc_server(app.handle().clone(), pipe_state);
-
-            WebviewWindowBuilder::new(app, "candidates", WebviewUrl::App("candidate.html".into()))
-                .decorations(false)
-                .always_on_top(true)
-                .skip_taskbar(true)
-                .transparent(true)
-                .shadow(false)
-                .resizable(false)
-                .visible(false)
-                .inner_size(200.0, 40.0)
-                .build()?;
-
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            get_candidates,
-            show_candidates_window,
-            hide_candidates_window,
-            on_candidate_selected
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");*/
     tauri::Builder::default()
         .manage(app_state.clone())
         .manage(pipe_state.clone())
         .setup(move |app| {
-            // 2. 将 app_state 传入管道后台任务，完全脱离前端独立运行
-            start_ipc_server(app.handle().clone(), pipe_state, app_state);
+            let window= WebviewWindowBuilder::new(
+                app,
+                "candidates",
+                WebviewUrl::App("candidate.html".into()),
+            )
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .transparent(true)
+            .shadow(false)
+            .resizable(false)
+            .focusable(true)
+            .visible(false)
+            .inner_size(240.0, 200.0)
+            .build()?;
 
-            WebviewWindowBuilder::new(app, "candidates", WebviewUrl::App("candidate.html".into()))
-                .decorations(false)
-                .always_on_top(true)
-                .skip_taskbar(true)
-                .transparent(true)
-                .shadow(false)
-                .resizable(false)
-                .visible(false)
-                .inner_size(200.0, 40.0)
-                .build()?;
+            start_ipc_server(
+                app.handle().clone(),
+                pipe_state,
+                app_state,
+            );
+
+            #[cfg(debug_assertions)]
+            window.open_devtools();
 
             Ok(())
         })
@@ -180,7 +158,7 @@ pub fn run() {
             get_candidates,
             show_candidates_window,
             hide_candidates_window,
-            on_candidate_selected
+            on_candidate_selected,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
