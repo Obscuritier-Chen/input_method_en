@@ -40,6 +40,12 @@ impl Predictor {
 
     ) -> Result<Vec<Candidate>> {
 
+        let context_ids = if context_ids.is_empty() {//应对context empty 的临时不严谨方案
+            vec![0i64]
+        } else {
+            context_ids.to_vec()
+        };
+
         let context_len = context_ids.len();
         let candidate_count = candidate_ids.len();
 
