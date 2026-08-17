@@ -62,8 +62,6 @@ fn show_candidates_window(
 
     window.show().map_err(|e| e.to_string())?;
 
-    window.set_focus().map_err(|e| e.to_string())?;
-
     Ok(())
 }
 
