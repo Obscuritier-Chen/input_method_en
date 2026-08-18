@@ -37,4 +37,5 @@ features = [
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_System_Pipes",
+    "Win32_UI_WindowsAndMessaging",
 ]

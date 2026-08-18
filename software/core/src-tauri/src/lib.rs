@@ -5,6 +5,7 @@ mod ipc_server;
 mod sdll;
 mod session;
 mod completion_service;
+mod windows_utils;
 
 pub use vocabulary::WordVocabulary;
 pub use candidate_index::CandidateIndex;
@@ -19,11 +20,20 @@ pub use completion_service::{
 use std::path::Path;
 use std::sync::{Mutex, Arc};
 
+use windows::Win32::Foundation::HWND;
+
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::WindowsAndMessaging::{
+    ShowWindow,
+    SW_SHOWNA,
+};
+
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter, State};
 
 use ime_protocol::ServerCommand;
 
 use crate::ipc_server::start_ipc_server;
+use crate::windows_utils::configure_no_activate;
 
 pub struct AppState {
     vocab: WordVocabulary,
@@ -60,7 +70,23 @@ fn show_candidates_window(
         .set_position(tauri::PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())?;
 
-    window.show().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        let raw_hwnd = window
+            .hwnd()
+            .map_err(|e| e.to_string())?;
+
+        let hwnd = HWND(raw_hwnd.0 as _);
+
+        configure_no_activate(hwnd);
+
+        unsafe {
+            let _ = ShowWindow(
+                hwnd,
+                SW_SHOWNA,
+            );
+        }
+    }
 
     Ok(())
 }
@@ -140,6 +166,17 @@ pub fn run() {
             .visible(false)
             .inner_size(240.0, 200.0)
             .build()?;
+
+            #[cfg(target_os = "windows")]
+            {
+                let raw_hwnd = window
+                    .hwnd()
+                    .map_err(|e| e.to_string())?;
+
+                let hwnd = raw_hwnd.0 as isize;
+                
+                configure_no_activate(windows::Win32::Foundation::HWND(hwnd as *mut _));
+            }
 
             start_ipc_server(
                 app.handle().clone(),
