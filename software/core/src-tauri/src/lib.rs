@@ -20,15 +20,6 @@ pub use completion_service::{
 use std::path::Path;
 use std::sync::{Mutex, Arc};
 
-use windows::Win32::Foundation::HWND;
-
-#[cfg(target_os = "windows")]
-use windows::Win32::UI::WindowsAndMessaging::{
-    ShowWindow,
-    SW_SHOWNA,
-    SW_HIDE,
-};
-
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter, State};
 
 use ime_protocol::ServerCommand;

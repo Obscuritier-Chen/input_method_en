@@ -245,6 +245,24 @@ impl KeyEditSession_Impl {
         };
 
         if buffer_empty {
+            let session_id = self.state.client_id.get();
+
+            if session_id != 0 {
+                if let Some(ipc) =
+                    self.state.ipc_client.borrow().as_ref()
+                {
+                    dbg(&format!(
+                        "[tsf] Backspace emptied composition, sending CancelComposition: session={}",
+                        session_id
+                    ));
+
+                    ipc.send(
+                        ClientRequest::CancelComposition {
+                            session_id,
+                        },
+                    );
+                }
+            }
             unsafe {
                 range.SetText(
                     ec,
@@ -259,9 +277,7 @@ impl KeyEditSession_Impl {
                 .composition
                 .borrow_mut() = None;
 
-            dbg(
-                "[tsf] Backspace: composition ended",
-            );
+            dbg("[tsf] Backspace: composition ended");
 
             return Ok(());
         }
