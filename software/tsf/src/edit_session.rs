@@ -51,7 +51,10 @@ impl ITfEditSession_Impl for KeyEditSession_Impl {
         // 1. 显式捕获 match 结果，避免 ? 隐式提前返回
         let res = match &self.action {
             KeyAction::Letter(ch) => self.insert_char(ec, *ch),
-            KeyAction::Backspace => self.remove_last_char(ec),
+            KeyAction::Backspace => {
+                dbg("[tsf] DoEditSession: Backspace");
+                self.remove_last_char(ec)
+            },
             KeyAction::Commit(text) => self.commit(ec, text),
             KeyAction::Tauricommit=>self.tauri_commit(ec),
         };
@@ -204,19 +207,99 @@ impl KeyEditSession_Impl {
     }
 
     fn remove_last_char(&self, ec: u32) -> Result<()> {
-        let mut buffer = self.state.buffer.borrow_mut();
-        if buffer.is_empty() {
+        {
+            let mut buffer = self.state.buffer.borrow_mut();
+
+            if buffer.is_empty() {
+                return Ok(());
+            }
+
+            buffer.pop();
+
+            dbg(&format!(
+                "[tsf] Backspace: buffer='{}'",
+                *buffer
+            ));
+        }
+
+        let composition = {
+            self.state
+                .composition
+                .borrow()
+                .clone()
+        };
+
+        let Some(composition) = composition else {
+            return Ok(());
+        };
+
+        let buffer_empty = {
+            self.state
+                .buffer
+                .borrow()
+                .is_empty()
+        };
+
+        let range = unsafe {
+            composition.GetRange()?
+        };
+
+        if buffer_empty {
+            unsafe {
+                range.SetText(
+                    ec,
+                    0,
+                    &[],
+                )?;
+
+                composition.EndComposition(ec)?;
+            }
+
+            *self.state
+                .composition
+                .borrow_mut() = None;
+
+            dbg(
+                "[tsf] Backspace: composition ended",
+            );
+
             return Ok(());
         }
-        buffer.pop();
 
-        if let Some(composition) = self.state.composition.borrow().as_ref() {
-            let range = unsafe { composition.GetRange()? };
-            // 简化处理:直接用 buffer 剩余内容整体重写这段 range
-            let text: Vec<u16> = buffer.encode_utf16().collect();
-            unsafe {
-                range.SetText(ec, 0, &text)?;
-            }
+        let text = {
+            self.state
+                .buffer
+                .borrow()
+                .encode_utf16()
+                .collect::<Vec<u16>>()
+        };
+
+        unsafe {
+            range.SetText(
+                ec,
+                0,
+                &text,
+            )?;
+
+            range.Collapse(
+                ec,
+                TF_ANCHOR_END,
+            )?;
+
+            let selection = TF_SELECTION {
+                range: ManuallyDrop::new(
+                    Some(range.clone()),
+                ),
+                style: TF_SELECTIONSTYLE {
+                    ase: TF_AE_NONE,
+                    fInterimChar: false.into(),
+                },
+            };
+
+            self.context.SetSelection(
+                ec,
+                &[selection],
+            )?;
         }
 
         Ok(())

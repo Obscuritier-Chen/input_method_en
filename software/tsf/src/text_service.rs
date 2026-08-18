@@ -195,6 +195,25 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         // 这里判断这个按键是否是你想拦截的(字母、数字、退格等)
         // 返回 TRUE 表示"我要吃掉这个按键",系统才会接着调用 OnKeyDown
         let vk = wparam.0 as u32;
+
+        if vk == 0x08 {
+            let has_composition =
+                self.state
+                    .composition
+                    .borrow()
+                    .is_some();
+
+            let intercepted = has_composition;
+
+            dbg(&format!(
+                "[tsf] [STEP 3] OnTestKeyDown: Backspace, composition_active={}, Intercepted={}",
+                has_composition,
+                intercepted
+            ));
+
+            return Ok(intercepted.into());
+        }
+
         let interesting = is_interesting_key(vk);
         dbg(&format!(
             "[tsf] [STEP 3] OnTestKeyDown: VK = 0x{:02X}, Intercepted = {}",
@@ -214,7 +233,38 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
         dbg(&format!("[tsf] [STEP 4] OnKeyDown triggered for VK = 0x{:02X}", vk));
 
+        if vk == 0x08 {
+            // 1. 拦截处理：无合成状态时直接放行
+            if self.state.composition.borrow().is_none() {
+                dbg("[tsf] Backspace: no active composition, passing to application");
+                return Ok(FALSE);
+            }
+
+            dbg("[tsf] KeyAction::Backspace");
+
+            let session: ITfEditSession = KeyEditSession {
+                state: self.state.clone(),
+                context: context.clone(),
+                action: KeyAction::Backspace,
+            }.into();
+
+            unsafe {
+                dbg("[tsf] Calling RequestEditSession for Backspace...");
+
+                let _ = context.RequestEditSession(
+                    self.client_id.get(),
+                    &session,
+                    TF_ES_SYNC | TF_ES_READWRITE,
+                )?;
+
+                dbg("[tsf] Backspace RequestEditSession returned Ok.");
+            }
+
+            return Ok(TRUE);
+        }
+
         let action = if vk == 0x08 {
+            dbg("[tsf] KeyAction::Backspace");
             KeyAction::Backspace
         } else if vk == 0x9 || vk == 0x0D {
             KeyAction::Tauricommit
