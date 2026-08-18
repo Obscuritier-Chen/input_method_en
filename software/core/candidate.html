@@ -1,48 +1,26 @@
-<!doctype html>
-<html>
-  <head>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
     <meta charset="UTF-8" />
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: transparent;
-        overflow: hidden;
-      }
-      #panel {
-        display: flex;
-        gap: 4px;
-        padding: 6px 8px;
-        background: rgba(30, 30, 30, 0.95);
-        border-radius: 8px;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        width: fit-content;
-      }
-      .item {
-        padding: 2px 8px;
-        color: #ddd;
-        border-radius: 4px;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .item:hover, .item.selected {
-        background: #4a7dfc;
-        color: #fff;
-      }
-      .idx {
-        color: #888;
-        font-size: 11px;
-        margin-right: 3px;
-      }
-      .item:hover .idx, .item.selected .idx {
-        color: #cdd;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="panel"></div>
-    <script type="module" src="/src/candidate_window.ts"></script>
-  </body>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+    <title>IME Candidates</title>
+
+    <link rel="stylesheet" href="./src/candidate.css" />
+</head>
+
+<body>
+    <main id="app">
+        <header id="prefix">
+            <span id="prefix-label">prefix:</span>
+            <span id="prefix-value"></span>
+        </header>
+
+        <section id="candidates"></section>
+    </main>
+
+    <script type="module" src="./src/candidate.ts"></script>
+</body>
 </html>
