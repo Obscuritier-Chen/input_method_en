@@ -5,11 +5,18 @@ use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DestroyWindow, DispatchMessageW, GetMessageW, PostMessageW,
     RegisterClassW, HWND_MESSAGE, MSG, WM_USER, WNDCLASSW,
+    CREATESTRUCTW,
+    DefWindowProcW,
+    GetWindowLongPtrW,
+    SetWindowLongPtrW,
+    GWLP_USERDATA,
+    WM_NCCREATE,
 };
-use windows::Win32::UI::TextServices::{ITfContext, TF_ES_READWRITE, TF_ES_SYNC};
+use windows::Win32::UI::TextServices::{ITfContext, ITfEditSession, TF_ES_ASYNCDONTCARE, TF_ES_READWRITE, TF_ES_SYNC};
 
 use crate::commit_session::CommitEditSession;
 use crate::text_service::SharedState;
+use crate::edit_session::{KeyEditSession, KeyAction};
 
 use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 
@@ -90,6 +97,20 @@ struct BridgeState {
     client_id: u32,
 }
 
+unsafe fn clone_shared_state_from_hwnd(hwnd: HWND) -> Option<Rc<SharedState>> {
+    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+
+    if ptr == 0 {
+        return None;
+    }
+
+    let ptr = ptr as *const SharedState;
+
+    Rc::increment_strong_count(ptr);
+
+    Some(Rc::from_raw(ptr))
+}
+
 /// 运行在主 STA 线程中的窗口回调函数
 unsafe extern "system" fn wnd_proc(
     hwnd: HWND,
@@ -98,23 +119,102 @@ unsafe extern "system" fn wnd_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+        WM_NCCREATE => {
+            let create_struct = &*(lparam.0 as *const CREATESTRUCTW);
+
+            SetWindowLongPtrW(
+                hwnd,
+                GWLP_USERDATA,
+                create_struct.lpCreateParams as isize,
+            );
+
+            return LRESULT(1);
+        }
+
         WM_IME_COMMIT => {
             if lparam.0 != 0 {
-                // 恢复堆上的 String 内存，用完后由 Rust 自动释放
-                let text = *Box::from_raw(lparam.0 as *mut String);
-                
-                // 从 WindowLongPtr 获取绑定的 BridgeState（此处简化为提取全局或传入的 session）
-                // 真正执行 RequestEditSession (合法地在主 STA 线程运行)
-                trigger_commit(hwnd, text);
+                let text =
+                    *Box::from_raw(
+                        lparam.0 as *mut String,
+                    );
 
-                dbg(&format!("WindowBridge WndProc received WM_CREATE, hwnd:{:?}", hwnd));
+                dbg(&format!("[tsf] WM_IME_COMMIT received: '{}'", text));
+
+                if let Err(e) = trigger_commit(hwnd, text){
+                    dbg(&format!(  "[tsf] trigger_commit failed: {:?}",e));
+                }
             }
-            LRESULT(0)
+
+            return LRESULT(0);
         }
-        _ => windows::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wparam, lparam),
+        
+        _ => {}
     }
+
+    DefWindowProcW(
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
-fn trigger_commit(_hwnd: HWND, _text: String) {
-    // 触发 CommitEditSession 将文本写入目标文档 (下一节实现)
+fn trigger_commit(hwnd: HWND, text: String) -> windows_core::Result<()>{
+    let state =
+    unsafe {
+        clone_shared_state_from_hwnd(hwnd)
+    }
+    .ok_or_else(|| {
+        windows::core::Error::from_win32()
+    })?;
+
+    let composition = {
+        let composition_ref =
+            state.composition.borrow();
+
+        composition_ref.clone().ok_or_else(|| {
+            windows::core::Error::from_hresult(
+                windows::core::HRESULT(
+                    -2147024809,
+                ),
+            )
+        })?
+    };
+
+    let range = unsafe {
+        composition.GetRange()?
+    };
+
+    let context = unsafe {
+        range.GetContext()?
+    };
+
+    dbg(&format!("[tsf] trigger_commit: client_id={}",state.client_id.get()));
+
+    let action = KeyAction::Commit(text);
+
+    let edit_session = KeyEditSession {
+        state: state.clone(),
+        context: context.clone(),
+        action,
+    };
+
+    let edit_session: ITfEditSession =
+        edit_session.into();
+
+    unsafe {
+        let session_result = context.RequestEditSession(
+            state.client_id.get(),
+            &edit_session,
+            TF_ES_SYNC| TF_ES_READWRITE,
+        )?;
+
+        dbg(&format!("[tsf] RequestEditSession client_id={}",state.client_id.get()));
+
+        dbg(&format!("[tsf] Commit RequestEditSession result = 0x{:08X}", session_result.0));
+    }
+
+    
+
+    Ok(())
 }

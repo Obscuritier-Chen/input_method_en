@@ -178,6 +178,12 @@ impl ITfCompositionSink_Impl for TextService_Impl {
         // 当组合在外部被终止（例如用户用鼠标点击了别处）时，清空内存组合状态
         *self.state.composition.borrow_mut() = None;
         self.state.buffer.borrow_mut().clear();
+
+        dbg(&format!(
+            "[tsf] before termination: buffer='{}', composition_active={}",
+            self.state.buffer.borrow(),
+            self.state.composition.borrow().is_some(),
+        ));
         Ok(())
     }
 }
@@ -210,8 +216,8 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
         let action = if vk == 0x08 {
             KeyAction::Backspace
-        } else if vk == 0x20 || vk == 0x0D {
-            KeyAction::Commit
+        } else if vk == 0x9 || vk == 0x0D {
+            KeyAction::Tauricommit
         } else if (0x41..=0x5A).contains(&vk) {
             KeyAction::Letter(vk_to_char(vk))
         } else {

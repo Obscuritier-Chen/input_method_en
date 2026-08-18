@@ -136,7 +136,7 @@ pub fn run() {
             .transparent(true)
             .shadow(false)
             .resizable(false)
-            .focusable(true)
+            .focusable(false)
             .visible(false)
             .inner_size(240.0, 200.0)
             .build()?;

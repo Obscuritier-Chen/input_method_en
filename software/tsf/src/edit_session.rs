@@ -24,7 +24,8 @@ fn dbg(msg: &str) {
 pub enum KeyAction {
     Letter(char),
     Backspace,
-    Commit,
+    Commit(String),
+    Tauricommit,
 }
 
 #[implement(ITfEditSession)]
@@ -51,7 +52,8 @@ impl ITfEditSession_Impl for KeyEditSession_Impl {
         let res = match &self.action {
             KeyAction::Letter(ch) => self.insert_char(ec, *ch),
             KeyAction::Backspace => self.remove_last_char(ec),
-            KeyAction::Commit => self.commit(ec),
+            KeyAction::Commit(text) => self.commit(ec, text),
+            KeyAction::Tauricommit=>self.tauri_commit(ec),
         };
 
         if let Err(e) = res {
@@ -61,6 +63,11 @@ impl ITfEditSession_Impl for KeyEditSession_Impl {
 
         // 2. 获取缓冲区文本并强行打印状态
         let buffer = self.state.buffer.borrow().clone();
+        dbg(&format!(
+            "[tsf] UpdateContext: buffer='{}', composition_active={}",
+            buffer,
+            self.state.composition.borrow().is_some()
+        ));
         let session_id = self.state.client_id.get();
         //dbg(&format!("[tsf] Current buffer: '{}', len: {}", buffer, buffer.len()));
 
@@ -215,13 +222,85 @@ impl KeyEditSession_Impl {
         Ok(())
     }
 
-    fn commit(&self, ec: u32) -> Result<()> {
-        if let Some(composition) = self.state.composition.borrow_mut().take() {
+    fn commit(
+        &self,
+        ec: u32,
+        text: &str,
+    ) -> Result<()> {
+        let composition = {
+            self.state
+                .composition
+                .borrow()
+                .clone()
+        };
+
+        let Some(composition) = composition else {
+            dbg( "[tsf] Commit requested but no active composition");
+            return Ok(());
+        };
+
+        let range = unsafe { composition.GetRange()? };
+
+        let utf16: Vec<u16> =
+            text.encode_utf16().collect();
+
+        unsafe {
+            range.SetText(
+                ec,
+                0,
+                &utf16,
+            )?;
+
+            // 2. 把 range 折叠到替换文本末尾
+            range.Collapse(
+                ec,
+                TF_ANCHOR_END,
+            )?;
+
+            // 3. 明确设置当前 selection/caret
+            let selection = TF_SELECTION {
+                range: ManuallyDrop::new(
+                    Some(range.clone()),
+                ),
+                style: TF_SELECTIONSTYLE {
+                    ase: TF_AE_NONE,
+                    fInterimChar: false.into(),
+                },
+            };
+
+            self.context.SetSelection(
+                ec,
+                &[selection],
+            )?;
+
+                composition.EndComposition(ec)?;
+        }
+
+        dbg(&format!("[tsf] Composition committed: '{}'",text));
+
+        self.state
+            .buffer
+            .borrow_mut()
+            .clear();
+
+        *self.state
+            .composition
+            .borrow_mut() = None;
+
+        Ok(())
+    }
+
+    fn tauri_commit(&self, ec: u32) -> Result<()> {
+        if let Some(composition) =
+            self.state.composition.borrow_mut().take()
+        {
             unsafe {
                 composition.EndComposition(ec)?;
             }
         }
+
         self.state.buffer.borrow_mut().clear();
+
         Ok(())
     }
 
