@@ -17,6 +17,8 @@ use windows::Win32::UI::TextServices::{
 };
 use windows::Win32::Foundation::{BOOL, WPARAM, LPARAM, TRUE, FALSE};
 
+use ime_protocol::ClientRequest;
+
 use windows::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 use windows::core::PCWSTR;
 
@@ -27,7 +29,7 @@ fn dbg(msg: &str) {
 
 use crate::edit_session::{KeyEditSession, KeyAction};
 use crate::window_bridge::WindowBridge;
-use crate::ipc_client::IpcClient;
+use crate::ipc_client::{IpcClient};
 
 #[derive(Debug, Clone)]
 
@@ -142,7 +144,19 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
     }
 
     fn Deactivate(&self) -> Result<()> {
-        //dbg("[tsf] Deactivate called!");
+        dbg("[tsf] Deactivate called!");
+
+        let session_id = self.state.client_id.get();
+
+        if session_id != 0 {
+            if let Some(ipc) =
+                self.state.ipc_client.borrow().as_ref()
+            {
+                dbg(&format!("[tsf] sending CancelComposition: session={}", session_id));
+
+                ipc.send(ClientRequest::CancelComposition {session_id,});
+            }
+    }
 
         if let Some(thread_mgr) = self.thread_mgr.borrow_mut().take() {
             if let Ok(keystroke_mgr) = thread_mgr.cast::<ITfKeystrokeMgr>() {
@@ -175,15 +189,29 @@ impl ITfCompositionSink_Impl for TextService_Impl {
         _pcomposition: Option<&ITfComposition>,
     ) -> Result<()> {
         dbg("[tsf] OnCompositionTerminated triggered");
+
+        let session_id = self.state.client_id.get();
+
+        if session_id != 0 {
+            if let Some(ipc) =
+                self.state.ipc_client.borrow().as_ref()
+            {
+                dbg(&format!(
+                    "[tsf] sending CancelComposition: session={}",
+                    session_id
+                ));
+
+                ipc.send(
+                    ClientRequest::CancelComposition {
+                        session_id,
+                    },
+                );
+            }
+        }
         // 当组合在外部被终止（例如用户用鼠标点击了别处）时，清空内存组合状态
         *self.state.composition.borrow_mut() = None;
         self.state.buffer.borrow_mut().clear();
 
-        dbg(&format!(
-            "[tsf] before termination: buffer='{}', composition_active={}",
-            self.state.buffer.borrow(),
-            self.state.composition.borrow().is_some(),
-        ));
         Ok(())
     }
 }

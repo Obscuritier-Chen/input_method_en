@@ -26,6 +26,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     ShowWindow,
     SW_SHOWNA,
+    SW_HIDE,
 };
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter, State};
@@ -33,7 +34,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter, State};
 use ime_protocol::ServerCommand;
 
 use crate::ipc_server::start_ipc_server;
-use crate::windows_utils::configure_no_activate;
+use crate::windows_utils::{configure_no_activate, show_candidate_window_native, hide_candidate_window_native};
 
 pub struct AppState {
     vocab: WordVocabulary,
@@ -72,20 +73,7 @@ fn show_candidates_window(
 
     #[cfg(target_os = "windows")]
     {
-        let raw_hwnd = window
-            .hwnd()
-            .map_err(|e| e.to_string())?;
-
-        let hwnd = HWND(raw_hwnd.0 as _);
-
-        configure_no_activate(hwnd);
-
-        unsafe {
-            let _ = ShowWindow(
-                hwnd,
-                SW_SHOWNA,
-            );
-        }
+        let _ = show_candidate_window_native(&window);
     }
 
     Ok(())
@@ -94,8 +82,17 @@ fn show_candidates_window(
 #[tauri::command]
 fn hide_candidates_window(app: tauri::AppHandle) -> Result<(), String> {
 
-    if let Some(window) = app.get_webview_window("candidates") {
-        window.hide().map_err(|e| e.to_string())?;
+    println!("[Candidate] hide_candidates_window invoked");
+
+    let window = app
+        .get_webview_window("candidates")
+        .ok_or_else(|| {
+            "candidate window not found".to_string()
+        })?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = hide_candidate_window_native(&window);
     }
 
     Ok(())
@@ -108,6 +105,12 @@ async fn on_candidate_selected(
     state: State<'_, SessionManager>,
     app_handle: tauri::AppHandle
 ) -> Result<(), String> {
+    if let Some(window) =
+        app_handle.get_webview_window("candidates")
+    {
+        hide_candidate_window_native(&window)?;
+    }
+
     let cmd = ServerCommand::CommitText {
         session_id,
         text: word,
@@ -117,11 +120,6 @@ async fn on_candidate_selected(
     state
         .send_to_session(session_id, cmd)
         .await?;
-
-    // 选完词后自动隐藏候选窗口
-    if let Some(window) = app_handle.get_webview_window("candidates") {
-        let _ = window.hide();
-    }
 
     Ok(())
 }

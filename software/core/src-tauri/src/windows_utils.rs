@@ -16,6 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOMOVE,
     SWP_NOSIZE,
     SWP_NOACTIVATE,
+    SW_HIDE,
 };
 
 #[cfg(target_os = "windows")]
@@ -50,4 +51,36 @@ pub fn configure_no_activate(hwnd: HWND) {
                 | SWP_NOACTIVATE,
         );
     }
+}
+
+pub fn show_candidate_window_native(
+    window: &tauri::WebviewWindow,
+) -> Result<(), String> {
+    let hwnd = window
+        .hwnd()
+        .map_err(|e| e.to_string())?;
+
+    let hwnd= HWND(hwnd.0 as _);
+
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_SHOWNA);
+    }
+
+    Ok(())
+}
+
+pub fn hide_candidate_window_native(
+    window: &tauri::WebviewWindow,
+) -> Result<(), String> {
+    let hwnd = window
+        .hwnd()
+        .map_err(|e| e.to_string())?;
+
+    let hwnd= HWND(hwnd.0 as _);
+
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_HIDE);
+    }
+
+    Ok(())
 }
