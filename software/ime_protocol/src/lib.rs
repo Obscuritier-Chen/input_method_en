@@ -21,6 +21,12 @@ pub enum ClientRequest {
     },
     /// 取消输入 / 组合态被清空
     CancelComposition { session_id: u32 },
+
+    /// 选择候选单词
+    SelectCandidate { 
+        session_id: u32,
+        index: u8,
+    },
 }
 
 /// Tauri 主进程 -> TSF DLL 反向下发的指令

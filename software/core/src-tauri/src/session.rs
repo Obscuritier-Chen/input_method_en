@@ -11,11 +11,14 @@ use tokio::sync::{
 
 use ime_protocol::ServerCommand;
 
+use crate::CandidateDto;
+
 
 #[derive(Clone)]
 pub struct SessionWriter {
     pub connection_id: u64,
     pub tx: mpsc::UnboundedSender<ServerCommand>,
+    pub candidates: Vec<CandidateDto>,
 }
 /// 管理所有活动 TSF 客户端连接的 Session Map
 #[derive(Clone)]
@@ -100,5 +103,58 @@ impl SessionManager {
                 connection_id
             );
         }
+    }
+
+    pub async fn set_candidates(
+        &self,
+        session_id: u32,
+        candidates: Vec<CandidateDto>,
+    ) -> Result<(), String> {
+        let mut sessions = self.sessions.lock().await;
+
+        let session = sessions
+            .get_mut(&session_id)
+            .ok_or_else(|| {
+                format!(
+                    "session {} not found",
+                    session_id
+                )
+            })?;
+
+        session.candidates =
+            candidates.into_iter().take(5).collect();
+
+        Ok(())
+    }
+
+    pub async fn get_candidate(
+        &self,
+        session_id: u32,
+        index: usize,
+    ) -> Result<String, String> {
+        let sessions =
+            self.sessions.lock().await;
+
+        let session = sessions
+            .get(&session_id)
+            .ok_or_else(|| {
+                format!(
+                    "session {} not found",
+                    session_id
+                )
+            })?;
+
+        let candidate = session
+            .candidates
+            .get(index)
+            .ok_or_else(|| {
+                format!(
+                    "candidate index {} out of range for session {}",
+                    index,
+                    session_id
+                )
+            })?;
+
+        Ok(candidate.word.clone())
     }
 }

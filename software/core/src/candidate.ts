@@ -133,6 +133,7 @@ async function requestCandidates(
             await invoke<CandidateDto[]>(
                 "get_candidates",
                 {
+                    session_id: currentSessionId,
                     buffer,
                     prefix,
                 },
@@ -191,6 +192,7 @@ async function handleUpdateContext(
             await invoke<CandidateDto[]>(
                 "get_candidates",
                 {
+                    sessionId: currentSessionId,
                     buffer,
                     prefix,
                 },

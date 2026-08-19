@@ -2,9 +2,10 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 use tokio::sync::{mpsc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use ime_protocol::{ClientRequest, ServerCommand};
+use crate::windows_utils::hide_candidate_window_native;
 use crate::{AppState, generate_candidates};
 use crate::sdll::SecurityAttributesGuard;
 use crate::session::{SessionManager, SessionWriter};
@@ -224,6 +225,7 @@ async fn handle_client(
                                 SessionWriter {
                                     connection_id,
                                     tx: tx.clone(),
+                                    candidates: Vec::new(),
                                 },
                             );
 
@@ -265,6 +267,53 @@ async fn handle_client(
                                 "[IPC] emit failed: {:?}",
                                 e
                             );
+                        }
+                    }
+
+                    ClientRequest::SelectCandidate { 
+                        session_id, 
+                        index 
+                    } => {
+                        println!("[IPC] SelectCandidate: session={}, index={}",session_id, index);
+
+                        let word = match state
+                            .get_candidate(
+                                *session_id,
+                                *index as usize,
+                            )
+                            .await{
+                            Ok(word) => word,
+
+                            Err(e) => {
+                                eprintln!("[IPC] SelectCandidate failed: {}", e);
+                                return;
+                            }
+                        };
+
+                        println!("[IPC] SelectCandidate resolved: '{}'", word);
+
+                        if let Some(window) = app_handle.get_webview_window("candidates")
+                        {
+                            if let Err(e) = hide_candidate_window_native(&window) {
+                                eprintln!("[IPC] Failed to hide candidate window: {:?}", e);
+                            }
+                        }
+
+                        let cmd =
+                            ServerCommand::CommitText {
+                                session_id: *session_id,
+                                text: word,
+                            };
+
+                        if let Err(e) =
+                            state
+                                .send_to_session(
+                                    *session_id,
+                                    cmd,
+                                )
+                                .await{
+                            eprintln!(
+                                "[IPC] CommitText routing failed: {}", e);
                         }
                     }
                 }

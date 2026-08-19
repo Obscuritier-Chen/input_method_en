@@ -38,13 +38,19 @@ async fn get_candidates(
     buffer: String,
     prefix: String,
     state: State<'_, Arc<AppState>>,
+    session_id: u32,
+    sessions: State<'_, SessionManager>,
 ) -> Result<Vec<CandidateDto>, String> {
 
-    generate_candidates(
+    let candidates = generate_candidates(
         buffer,
         prefix,
         state.as_ref(),
-    )
+    )?;
+
+    sessions.set_candidates(session_id, candidates.clone()).await?;
+
+    Ok(candidates)
 }
 
 #[tauri::command]

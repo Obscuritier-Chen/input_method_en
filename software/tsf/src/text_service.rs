@@ -224,6 +224,22 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         // 返回 TRUE 表示"我要吃掉这个按键",系统才会接着调用 OnKeyDown
         let vk = wparam.0 as u32;
 
+        if (0x31..=0x35).contains(&vk) {
+            let has_composition =
+                self.state
+                    .composition
+                    .borrow()
+                    .is_some();
+
+            dbg(&format!(
+                "[tsf] OnTestKeyDown: number={}, composition_active={}",
+                vk - 0x30,
+                has_composition
+            ));
+
+            return Ok(has_composition.into());
+        }
+
         if vk == 0x08 {
             let has_composition =
                 self.state
@@ -260,6 +276,38 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         let vk = wparam.0 as u32;
 
         dbg(&format!("[tsf] [STEP 4] OnKeyDown triggered for VK = 0x{:02X}", vk));
+
+        if (0x31..=0x35).contains(&vk) {
+            let index =
+                (vk - 0x31) as u8;
+
+            let session_id =
+                self.state.client_id.get();
+
+            dbg(&format!(
+                "[tsf] Candidate selection key: {} -> index={}, session={}",
+                index + 1,
+                index,
+                session_id
+            ));
+
+            if let Some(ipc) =
+                self.state.ipc_client.borrow().as_ref()
+            {
+                ipc.send(
+                    ClientRequest::SelectCandidate {
+                        session_id,
+                        index,
+                    },
+                );
+            } else {
+                dbg(
+                    "[tsf] SelectCandidate: IPC client unavailable",
+                );
+            }
+
+            return Ok(TRUE);
+        }
 
         if vk == 0x08 {
             // 1. 拦截处理：无合成状态时直接放行
