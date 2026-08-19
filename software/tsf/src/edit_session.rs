@@ -276,6 +276,7 @@ impl KeyEditSession_Impl {
             *self.state
                 .composition
                 .borrow_mut() = None;
+            self.state.candidate_count.set(0);
 
             dbg("[tsf] Backspace: composition ended");
 

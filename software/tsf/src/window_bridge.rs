@@ -26,6 +26,7 @@ fn dbg(msg: &str) {
 }
 
 pub const WM_IME_COMMIT: u32 = WM_USER + 101;
+const WM_IME_CANDIDATE_COUNT: u32 = WM_USER + 102;
 
 pub struct WindowBridge {
     hwnd: HWND,
@@ -77,6 +78,17 @@ impl WindowBridge {
         let ptr = Box::into_raw(Box::new(text));
         unsafe {
             let _ = PostMessageW(self.hwnd, WM_IME_COMMIT, WPARAM(0), LPARAM(ptr as isize));
+        }
+    }
+
+    pub fn post_candidate_count(&self, count: u8) {
+        unsafe {
+            let _ = PostMessageW(
+                self.hwnd,
+                WM_IME_CANDIDATE_COUNT,
+                WPARAM(count as usize),
+                LPARAM(0),
+            );
         }
     }
 }
@@ -143,6 +155,32 @@ unsafe extern "system" fn wnd_proc(
                 if let Err(e) = trigger_commit(hwnd, text){
                     dbg(&format!(  "[tsf] trigger_commit failed: {:?}",e));
                 }
+            }
+
+            return LRESULT(0);
+        }
+
+        WM_IME_CANDIDATE_COUNT => {
+            let count = wparam.0 as u8;
+
+            dbg(&format!(
+                "[tsf] WM_IME_CANDIDATE_COUNT received: {}",
+                count
+            ));
+
+            if let Some(state) =
+                unsafe { clone_shared_state_from_hwnd(hwnd) }
+            {
+                state.candidate_count.set(count as u32);
+
+                dbg(&format!(
+                    "[tsf] candidate_count updated: {}",
+                    count
+                ));
+            } else {
+                dbg(
+                    "[tsf] failed to acquire SharedState for candidate count",
+                );
             }
 
             return LRESULT(0);

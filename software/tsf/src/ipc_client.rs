@@ -119,6 +119,14 @@ async fn run_ipc_client(
                                 dbg(&format!("[tsf] Triggering CommitText: {}", text));
                                 bridge.post_commit(text);
                             }
+
+                            ServerCommand::UpdateCandidateCount {
+                                session_id: _,
+                                count,
+                            } => {
+                                dbg(&format!("[tsf] Received candidate count: {}", count));
+                                bridge.post_candidate_count(count);
+                            }
                             _ => dbg("[tsf] Received unsupported ServerCommand"),
                         }
                     } else {

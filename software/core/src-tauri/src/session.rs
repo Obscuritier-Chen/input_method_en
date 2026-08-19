@@ -18,7 +18,7 @@ use crate::CandidateDto;
 pub struct SessionWriter {
     pub connection_id: u64,
     pub tx: mpsc::UnboundedSender<ServerCommand>,
-    pub candidates: Vec<CandidateDto>,
+    pub candidates: Vec<String>,
 }
 /// 管理所有活动 TSF 客户端连接的 Session Map
 #[derive(Clone)]
@@ -108,7 +108,7 @@ impl SessionManager {
     pub async fn set_candidates(
         &self,
         session_id: u32,
-        candidates: Vec<CandidateDto>,
+        candidates: Vec<String>,
     ) -> Result<(), String> {
         let mut sessions = self.sessions.lock().await;
 
@@ -155,6 +155,6 @@ impl SessionManager {
                 )
             })?;
 
-        Ok(candidate.word.clone())
+        Ok(candidate.clone())
     }
 }

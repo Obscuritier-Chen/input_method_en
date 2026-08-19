@@ -37,4 +37,9 @@ pub enum ServerCommand {
         session_id: u32,
         text: String,
     },
+
+    UpdateCandidateCount {
+        session_id: u32,
+        count: u8,
+    },
 }

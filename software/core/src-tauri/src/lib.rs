@@ -48,7 +48,32 @@ async fn get_candidates(
         state.as_ref(),
     )?;
 
-    sessions.set_candidates(session_id, candidates.clone()).await?;
+    let top5: Vec<String> = candidates
+        .iter()
+        .take(5)
+        .map(|c| c.word.clone())
+        .collect();
+
+    // 保存当前 session 的 Top 5 候选
+    sessions
+        .set_candidates(
+            session_id,
+            top5.clone(),
+        )
+        .await?;
+
+    // 同步候选数量到 TSF
+    let count = top5.len() as u8;
+
+    sessions
+        .send_to_session(
+            session_id,
+            ServerCommand::UpdateCandidateCount {
+                session_id,
+                count,
+            },
+        )
+        .await?;
 
     Ok(candidates)
 }

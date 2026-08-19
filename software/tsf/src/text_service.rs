@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::fmt;
@@ -47,6 +47,7 @@ pub struct SharedState {
     pub ipc_client: RefCell<Option<IpcClient>>,
     pub bridge: RefCell<Option<Arc<WindowBridge>>>,
     pub composition_sink: RefCell<Option<ITfCompositionSink>>,
+    pub candidate_count: Cell<u32>,
 }
 
 impl fmt::Debug for SharedState {
@@ -73,6 +74,7 @@ impl TextService {
                 ipc_client: RefCell::new(None),
                 bridge: RefCell::new(None),
                 composition_sink: RefCell::new(None),
+                candidate_count: Cell::new(0),
             }),
         }
     }
@@ -176,6 +178,7 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
         self.state.buffer.borrow_mut().clear();
         *self.state.composition.borrow_mut() = None;
         *self.state.composition_sink.borrow_mut() = None;
+        self.state.candidate_count.set(0);
 
         dbg("[tsf] Deactivate complete.");
         Ok(())
@@ -211,6 +214,7 @@ impl ITfCompositionSink_Impl for TextService_Impl {
         // 当组合在外部被终止（例如用户用鼠标点击了别处）时，清空内存组合状态
         *self.state.composition.borrow_mut() = None;
         self.state.buffer.borrow_mut().clear();
+        self.state.candidate_count.set(0);
 
         Ok(())
     }
@@ -281,6 +285,30 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             let index =
                 (vk - 0x31) as u8;
 
+            let has_composition = self
+                .state
+                .composition
+                .borrow()
+                .is_some();
+
+            let has_buffer = !self
+                .state
+                .buffer
+                .borrow()
+                .is_empty();
+
+            let candidate_count =
+                self.state.candidate_count.get() as u8;
+
+            let can_select =
+                has_composition
+                && has_buffer
+                && index < candidate_count;
+
+            if !can_select {
+                return Ok(FALSE);
+            }
+
             let session_id =
                 self.state.client_id.get();
 
@@ -290,6 +318,8 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
                 index,
                 session_id
             ));
+
+            self.state.candidate_count.set(0);
 
             if let Some(ipc) =
                 self.state.ipc_client.borrow().as_ref()
